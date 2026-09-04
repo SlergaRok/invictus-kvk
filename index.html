@@ -49,6 +49,7 @@ tr.clickable{cursor:pointer}
 .tl-step.empty .tl-phase{color:var(--muted)}
 .tl-kp{font-size:12px;color:var(--accent2);margin-top:4px}
 .tl-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.tl-dates{font-size:11px;color:#5c6b85;margin-top:6px;padding-top:6px;border-top:1px dashed #1c2535}
 .chart-wrap{padding:6px 20px 22px}
 .legend{display:flex;gap:16px;padding:0 20px 14px;font-size:12px;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
@@ -198,7 +199,7 @@ async function loadPlayerDetail(id) {
 }
 
 function buildLineChart(phases, key, color) {
-    const w = 640, h = 200, padL = 46, padR = 20, padT = 16, padB = 30;
+    const w = 640, h = 220, padL = 46, padR = 20, padT = 30, padB = 34;
     const vals = phases.map(p => p[key] || 0);
     const maxV = Math.max(...vals, 1);
     const stepX = (w - padL - padR) / Math.max(phases.length - 1, 1);
@@ -213,22 +214,36 @@ function buildLineChart(phases, key, color) {
         const y = padT + f * (h - padT - padB);
         return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}" stroke="#1c2535" stroke-width="1"/>`;
     }).join('');
-    const labels = phases.map((p, i) => `<text x="${points[i][0].toFixed(1)}" y="${h - 8}" fill="#8994aa" font-size="11" text-anchor="middle">${esc(p.label)}</text>`).join('');
+    const labels = phases.map((p, i) => `<text x="${points[i][0].toFixed(1)}" y="${h - 10}" fill="#8994aa" font-size="11" text-anchor="middle">${esc(p.label)}</text>`).join('');
+    // Etiqueta con el valor exacto sobre (o bajo, si no cabe) cada punto — visible siempre, no solo al pasar el ratón.
+    const valueLabels = phases.map((p, i) => {
+        const above = points[i][1] > padT + 16;
+        const y = above ? points[i][1] - 12 : points[i][1] + 20;
+        return `<text x="${points[i][0].toFixed(1)}" y="${y.toFixed(1)}" fill="${color}" font-size="12" font-weight="700" text-anchor="middle">${fmt(vals[i])}</text>`;
+    }).join('');
     const dots = points.map((pt, i) => `<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="4" fill="${color}"/><title>${esc(phases[i].label)}: ${fmt(vals[i])}</title>`).join('');
-    return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">${gridLines}<path d="${area}" fill="${color}" opacity="0.12"/><path d="${path}" fill="none" stroke="${color}" stroke-width="2.5"/>${dots}${labels}</svg>`;
+    return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">${gridLines}<path d="${area}" fill="${color}" opacity="0.12"/><path d="${path}" fill="none" stroke="${color}" stroke-width="2.5"/>${dots}${valueLabels}${labels}</svg>`;
 }
 
-function classifyPhase(payloadPhases, cfg) {
+function classifyPhase(payloadPhases, schedule, cfg) {
     const found = (payloadPhases || []).find(p => p.phase === cfg.key);
+    const dates = (schedule && schedule[cfg.key]) || null;
     if (!found) {
-        return { ...cfg, kp: 0, deads: 0, t4: 0, t5: 0, kills: 0, missing: true, upcoming: false };
+        return { ...cfg, kp: 0, deads: 0, t4: 0, t5: 0, kills: 0, missing: true, upcoming: false, dates };
     }
     const allZero = !(found.kp || found.deads || found.t4 || found.t5 || found.kills);
-    return { ...cfg, kp: found.kp, deads: found.deads, t4: found.t4, t5: found.t5, kills: found.kills, missing: false, upcoming: allZero };
+    return { ...cfg, kp: found.kp, deads: found.deads, t4: found.t4, t5: found.t5, kills: found.kills, missing: false, upcoming: allZero, dates };
+}
+
+function formatDateRange(dates) {
+    if (!dates || (!dates.start && !dates.end)) return '';
+    if (dates.start && dates.end) return dates.start + ' – ' + dates.end;
+    return dates.start || dates.end;
 }
 
 function renderPlayer(payload, fallbackName) {
-    const phases = PHASES.map(cfg => classifyPhase(payload.phases, cfg));
+    const schedule = payload.schedule || {};
+    const phases = PHASES.map(cfg => classifyPhase(payload.phases, schedule, cfg));
 
     const name = payload.name || fallbackName || 'Unknown';
     document.getElementById('playerName').textContent = name;
@@ -245,12 +260,14 @@ function renderPlayer(payload, fallbackName) {
         const faded = p.missing || p.upcoming;
         const statusText = p.missing ? 'No data' : (p.upcoming ? 'Upcoming' : fmt(p.kp) + ' KP');
         const subText = faded ? '' : fmt(p.kills) + ' kills · ' + fmt(p.deads) + ' deads';
+        const dateText = formatDateRange(p.dates);
         return `
 <div class="tl-step ${faded ? 'empty' : ''}">
   <div class="tl-dot"></div>
   <div class="tl-phase">${esc(p.label)}</div>
   <div class="tl-kp">${statusText}</div>
   <div class="tl-sub">${subText}</div>
+  ${dateText ? `<div class="tl-dates">${esc(dateText)}</div>` : ''}
 </div>`;
     }).join('');
 
