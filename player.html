@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>INVICTUS — Player Timeline</title>
+<style>
+:root{--bg:#080b12;--panel:#101521;--panel2:#151c2a;--line:#263044;--text:#eef3ff;--muted:#8994aa;--accent:#7c5cff;--accent2:#20d6b5;--gold:#f4c95d;--silver:#b9c4d6;--bronze:#c68b5b;--red:#ff8f9b}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at 10% 0%,#1a1734 0,#080b12 38%),#080b12;color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+.container{max-width:980px;margin:auto;padding:28px}
+.back{display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;font-size:13px;margin-bottom:18px}
+.back:hover{color:var(--text)}
+.header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:24px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.22em;color:var(--accent2);font-weight:800}
+h1{font-size:32px;margin:6px 0 4px;letter-spacing:-.04em;word-break:break-word}
+.subtitle{color:var(--muted);font-size:13px}
+.badge{border:1px solid var(--line);background:#0d121c;padding:10px 14px;border-radius:12px;color:#c8d1e3;font-size:13px;white-space:nowrap}
+.state{padding:70px 20px;text-align:center;color:var(--muted)}
+.spinner{width:28px;height:28px;border-radius:50%;border:3px solid #222b3c;border-top-color:var(--accent2);animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error{color:var(--red)}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+.card{background:linear-gradient(145deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:18px;padding:16px}
+.card .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.card .value{font-size:24px;font-weight:800;margin-top:6px}
+.panel{background:rgba(16,21,33,.94);border:1px solid var(--line);border-radius:20px;overflow:hidden;margin-bottom:18px}
+.panel-head{padding:18px 20px;border-bottom:1px solid var(--line)}
+.panel-head h2{font-size:16px;margin:0}
+.panel-head .small{font-size:12px;color:var(--muted);margin-top:2px}
+.timeline{padding:26px 24px 10px;position:relative}
+.tl-track{position:absolute;left:44px;right:44px;top:38px;height:2px;background:var(--line)}
+.tl-steps{display:flex;justify-content:space-between;position:relative;gap:8px}
+.tl-step{flex:1;text-align:center;min-width:0}
+.tl-dot{width:14px;height:14px;border-radius:50%;background:var(--panel2);border:2px solid var(--accent);margin:0 auto 10px;position:relative;z-index:1}
+.tl-step.empty .tl-dot{border-color:var(--line);background:#0c111b}
+.tl-phase{font-weight:750;font-size:13px}
+.tl-step.empty .tl-phase{color:var(--muted)}
+.tl-kp{font-size:12px;color:var(--accent2);margin-top:4px}
+.tl-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.chart-wrap{padding:6px 20px 22px}
+.legend{display:flex;gap:16px;padding:0 20px 14px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#111827;color:#8994aa;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:12px;border-bottom:1px solid var(--line)}
+th:first-child{text-align:left}
+td{padding:12px;border-bottom:1px solid #1c2535;text-align:right}
+td:first-child{text-align:left;font-weight:700}
+.footer{margin-top:6px;color:#68748a;font-size:11px;text-align:right}
+@media(max-width:700px){.cards{grid-template-columns:1fr 1fr}.tl-track{display:none}.tl-steps{flex-direction:column;gap:16px}.tl-step{display:flex;align-items:center;gap:12px;text-align:left}.tl-dot{margin:0}}
+</style>
+</head>
+<body>
+<div class="container">
+<a class="back" href="index.html">← Volver al leaderboard</a>
+<div class="header">
+  <div>
+    <div class="eyebrow">INVICTUS • PLAYER TIMELINE</div>
+    <h1 id="playerName">Cargando…</h1>
+    <div class="subtitle" id="playerId"></div>
+  </div>
+  <div class="badge" id="rankBadge">—</div>
+</div>
+
+<div id="content">
+  <div class="state"><div class="spinner"></div>Cargando datos del jugador…</div>
+</div>
+
+<div class="footer">Fases del KvK — orden cronológico: KL → Zone 6 → Zone 5 → Altars</div>
+</div>
+
+<script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbxwZypD57GcsAxoiR_Jk6x4mApNnezmkECaU-JrQ1IMF5m-03SRQfxyQluZOUCiyboh/exec';
+const PHASE_ORDER = ['KL', 'Zone 6', 'Zone 5', 'Altars'];
+
+const params = new URLSearchParams(location.search);
+const playerId = params.get('id') || '';
+const playerNameHint = params.get('name') || '';
+
+const fmt = n => { n = Number(n || 0); const a = Math.abs(n); if (a >= 1e9) return (n / 1e9).toFixed(2) + 'B'; if (a >= 1e6) return (n / 1e6).toFixed(2) + 'M'; if (a >= 1e3) return (n / 1e3).toFixed(1) + 'K'; return Math.round(n).toLocaleString() };
+const esc = s => String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+
+async function loadPlayer(id) {
+    const url = API_URL + '?id=' + encodeURIComponent(id);
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('HTTP ' + response.status + ' al llamar al Apps Script');
+    return response.json();
+}
+
+function buildLineChart(phases, key, color) {
+    const w = 640, h = 200, padL = 46, padR = 20, padT = 16, padB = 30;
+    const vals = phases.map(p => p[key] || 0);
+    const maxV = Math.max(...vals, 1);
+    const stepX = (w - padL - padR) / Math.max(phases.length - 1, 1);
+    const points = phases.map((p, i) => {
+        const x = padL + i * stepX;
+        const y = padT + (1 - (p[key] || 0) / maxV) * (h - padT - padB);
+        return [x, y];
+    });
+    const path = points.map((pt, i) => (i === 0 ? 'M' : 'L') + pt[0].toFixed(1) + ',' + pt[1].toFixed(1)).join(' ');
+    const area = path + ` L${points[points.length - 1][0].toFixed(1)},${h - padB} L${points[0][0].toFixed(1)},${h - padB} Z`;
+
+    const gridLines = [0, 0.25, 0.5, 0.75, 1].map(f => {
+        const y = padT + f * (h - padT - padB);
+        return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}" stroke="#1c2535" stroke-width="1"/>`;
+    }).join('');
+
+    const labels = phases.map((p, i) => `<text x="${points[i][0].toFixed(1)}" y="${h - 8}" fill="#8994aa" font-size="11" text-anchor="middle">${esc(p.phase)}</text>`).join('');
+    const dots = points.map((pt, i) => `<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="4" fill="${color}"/><title>${esc(phases[i].phase)}: ${fmt(vals[i])}</title>`).join('');
+
+    return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+${gridLines}
+<path d="${area}" fill="${color}" opacity="0.12"/>
+<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5"/>
+${dots}
+${labels}
+</svg>`;
+}
+
+function render(payload) {
+    const phases = PHASE_ORDER.map(name => {
+        const found = (payload.phases || []).find(p => p.phase === name);
+        return found || { phase: name, kp: 0, deads: 0, t4: 0, t5: 0, kills: 0, empty: true };
+    });
+
+    const name = payload.name || playerNameHint || 'Unknown';
+    document.getElementById('playerName').textContent = name;
+    document.getElementById('playerId').textContent = 'ID ' + (payload.id || playerId);
+    document.getElementById('rankBadge').textContent = phases.filter(p => !p.empty).length + ' / ' + PHASE_ORDER.length + ' fases con datos';
+
+    const totalKp = phases.reduce((s, p) => s + (p.kp || 0), 0);
+    const totalKills = phases.reduce((s, p) => s + (p.kills || 0), 0);
+    const totalDeads = phases.reduce((s, p) => s + (p.deads || 0), 0);
+    const bestPhase = phases.reduce((best, p) => (p.kp || 0) > (best.kp || 0) ? p : best, phases[0]);
+
+    const stepsHtml = phases.map(p => `
+<div class="tl-step ${p.empty ? 'empty' : ''}">
+  <div class="tl-dot"></div>
+  <div class="tl-phase">${esc(p.phase)}</div>
+  <div class="tl-kp">${p.empty ? 'Sin datos' : fmt(p.kp) + ' KP'}</div>
+  <div class="tl-sub">${p.empty ? '' : fmt(p.kills) + ' kills · ' + fmt(p.deads) + ' deads'}</div>
+</div>`).join('');
+
+    document.getElementById('content').innerHTML = `
+<section class="cards">
+  <div class="card"><div class="label">Killpoints totales</div><div class="value">${fmt(totalKp)}</div></div>
+  <div class="card"><div class="label">Kills T4+T5</div><div class="value">${fmt(totalKills)}</div></div>
+  <div class="card"><div class="label">Deads</div><div class="value">${fmt(totalDeads)}</div></div>
+  <div class="card"><div class="label">Mejor fase</div><div class="value" style="font-size:20px">${esc(bestPhase.phase)}</div></div>
+</section>
+
+<div class="panel">
+  <div class="panel-head"><h2>Timeline por fases</h2><div class="small">Orden cronológico del KvK</div></div>
+  <div class="timeline"><div class="tl-track"></div><div class="tl-steps">${stepsHtml}</div></div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><h2>Killpoints por fase</h2><div class="small">Evolución a lo largo del evento</div></div>
+  <div class="legend"><span><i class="dot" style="background:var(--accent2)"></i>Killpoints</span></div>
+  <div class="chart-wrap">${buildLineChart(phases, 'kp', '#20d6b5')}</div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><h2>Kills T4+T5 por fase</h2><div class="small">Evolución a lo largo del evento</div></div>
+  <div class="legend"><span><i class="dot" style="background:var(--accent)"></i>Kills</span></div>
+  <div class="chart-wrap">${buildLineChart(phases, 'kills', '#7c5cff')}</div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><h2>Detalle por fase</h2></div>
+  <table>
+    <thead><tr><th>Fase</th><th>KP</th><th>Deads</th><th>T4</th><th>T5</th><th>Kills</th></tr></thead>
+    <tbody>${phases.map(p => `<tr><td>${esc(p.phase)}</td><td>${p.empty ? '—' : fmt(p.kp)}</td><td>${p.empty ? '—' : fmt(p.deads)}</td><td>${p.empty ? '—' : fmt(p.t4)}</td><td>${p.empty ? '—' : fmt(p.t5)}</td><td>${p.empty ? '—' : fmt(p.kills)}</td></tr>`).join('')}</tbody>
+  </table>
+</div>`;
+}
+
+async function main() {
+    if (!playerId) {
+        document.getElementById('content').innerHTML = '<div class="state error">Falta el ID del jugador en la URL.</div>';
+        return;
+    }
+    document.getElementById('playerName').textContent = playerNameHint || 'Cargando…';
+    try {
+        const payload = await loadPlayer(playerId);
+        render(payload);
+    } catch (err) {
+        console.error(err);
+        document.getElementById('content').innerHTML = `<div class="state error">Error cargando datos: ${esc(err.message)}</div>`;
+    }
+}
+
+main();
+</script>
+</body>
+</html>
