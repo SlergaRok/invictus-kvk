@@ -32,8 +32,10 @@ tr.clickable{cursor:pointer}
 
 /* --- Vista de jugador --- */
 .view{display:none}.view.active{display:block}
-.back{display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;font-size:13px;margin-bottom:18px;background:none;border:none;cursor:pointer;font-family:inherit;padding:0}
-.back:hover{color:var(--text)}
+.back{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;font-size:13px;font-weight:700;margin-bottom:18px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;cursor:pointer;font-family:inherit;padding:10px 16px;transition:border-color .15s,background .15s,transform .1s}
+.back:hover{border-color:var(--accent2);background:#182131}
+.back:active{transform:translateY(1px)}
+.back .arrow{color:var(--accent2);font-size:15px}
 .state{padding:70px 20px;text-align:center;color:var(--muted)}
 .error{color:var(--red)}
 #playerCards .value{font-size:24px}
@@ -67,7 +69,7 @@ tr.clickable{cursor:pointer}
 <div class="card"><div class="label">Total Contribution</div><div class="value">6.31B</div></div>
 </section>
 <section class="layout">
-<div class="panel"><div class="panel-head"><h2>Top performers</h2><span class="small">Contribution</span></div><div class="podium" id="podium"><div class="loading-row"><div class="spinner"></div><div class="loading-text">Cargando…</div></div></div></div>
+<div class="panel"><div class="panel-head"><h2>Top performers</h2><span class="small">Contribution</span></div><div class="podium" id="podium"><div class="loading-row"><div class="spinner"></div><div class="loading-text">Loading…</div></div></div></div>
 <div class="panel"><div class="panel-head"><h2>Member leaderboard</h2><span class="small" id="count">142 members</span></div>
 <div class="controls"><input id="search" placeholder="Search player or ID…"><select id="sort"><option value="rank">Rank</option><option value="contribution">Contribution</option><option value="kp">Killpoints</option><option value="deads">Deads</option><option value="kills">T4 + T5 kills</option></select></div>
 <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Player</th><th>Power Δ</th><th>KP</th><th>Deads</th><th>T4</th><th>T5</th><th>Kills</th><th>Contribution</th></tr></thead><tbody id="tbody"></tbody></table></div>
@@ -79,25 +81,32 @@ tr.clickable{cursor:pointer}
 <!-- ===== Vista: Detalle de jugador ===== -->
 <div id="view-player" class="view">
 <div class="container">
-<button class="back" id="backBtn">← Volver al leaderboard</button>
+<button class="back" id="backBtn"><span class="arrow">←</span> Back to leaderboard</button>
 <div class="header">
   <div>
     <div class="eyebrow">INVICTUS • PLAYER TIMELINE</div>
-    <h1 id="playerName">Cargando…</h1>
+    <h1 id="playerName">Loading…</h1>
     <div class="subtitle" id="playerId"></div>
   </div>
   <div class="badge" id="rankBadge">—</div>
 </div>
 <div id="playerContent">
-  <div class="state"><div class="spinner"></div>Cargando datos del jugador…</div>
+  <div class="state"><div class="spinner"></div>Loading player data…</div>
 </div>
-<div class="footer">Fases del KvK — orden cronológico: KL → Zone 6 → Zone 5 → Altars</div>
+<div class="footer">KvK phases — chronological order: Pass 5 → Altar → Pass 6 → Kingland</div>
 </div>
 </div>
 
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbwyz8HJGDPxR_l0-V_GSoaG1rRxQmmzCZsu1O-4B6YNvo9-vRS3Wy2L8NL215ZfSIfV/exec';
-const PHASE_ORDER = ['KL', 'Zone 6', 'Zone 5', 'Altars'];
+// Chronological KvK phases: internal sheet key -> display label.
+// KL (Kingland) hasn't happened yet, so it will show as "Upcoming" until the sheet has real values.
+const PHASES = [
+    { key: 'Zone 5', label: 'Pass 5' },
+    { key: 'Altars', label: 'Altar' },
+    { key: 'Zone 6', label: 'Pass 6' },
+    { key: 'KL', label: 'Kingland' }
+];
 
 let players = [];
 const playerCache = new Map(); // evita volver a pedir el detalle si ya se visitó
@@ -164,7 +173,7 @@ function renderTable() {
 }
 
 async function loadDashboard() {
-    document.getElementById('tbody').innerHTML = '<tr class="loading-row"><td colspan="9"><div class="spinner"></div><div class="loading-text">Cargando datos…</div></td></tr>';
+    document.getElementById('tbody').innerHTML = '<tr class="loading-row"><td colspan="9"><div class="spinner"></div><div class="loading-text">Loading data…</div></td></tr>';
     try {
         const raw = await loadData();
         players = raw.map(mapPlayer);
@@ -172,7 +181,7 @@ async function loadDashboard() {
         renderTable();
     } catch (err) {
         console.error(err);
-        document.getElementById('tbody').innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--red)">Error cargando datos: ${esc(err.message)}</td></tr>`;
+        document.getElementById('tbody').innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--red)">Error loading data: ${esc(err.message)}</td></tr>`;
     }
 }
 
@@ -204,68 +213,80 @@ function buildLineChart(phases, key, color) {
         const y = padT + f * (h - padT - padB);
         return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}" stroke="#1c2535" stroke-width="1"/>`;
     }).join('');
-    const labels = phases.map((p, i) => `<text x="${points[i][0].toFixed(1)}" y="${h - 8}" fill="#8994aa" font-size="11" text-anchor="middle">${esc(p.phase)}</text>`).join('');
-    const dots = points.map((pt, i) => `<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="4" fill="${color}"/><title>${esc(phases[i].phase)}: ${fmt(vals[i])}</title>`).join('');
+    const labels = phases.map((p, i) => `<text x="${points[i][0].toFixed(1)}" y="${h - 8}" fill="#8994aa" font-size="11" text-anchor="middle">${esc(p.label)}</text>`).join('');
+    const dots = points.map((pt, i) => `<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="4" fill="${color}"/><title>${esc(phases[i].label)}: ${fmt(vals[i])}</title>`).join('');
     return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">${gridLines}<path d="${area}" fill="${color}" opacity="0.12"/><path d="${path}" fill="none" stroke="${color}" stroke-width="2.5"/>${dots}${labels}</svg>`;
 }
 
+function classifyPhase(payloadPhases, cfg) {
+    const found = (payloadPhases || []).find(p => p.phase === cfg.key);
+    if (!found) {
+        return { ...cfg, kp: 0, deads: 0, t4: 0, t5: 0, kills: 0, missing: true, upcoming: false };
+    }
+    const allZero = !(found.kp || found.deads || found.t4 || found.t5 || found.kills);
+    return { ...cfg, kp: found.kp, deads: found.deads, t4: found.t4, t5: found.t5, kills: found.kills, missing: false, upcoming: allZero };
+}
+
 function renderPlayer(payload, fallbackName) {
-    const phases = PHASE_ORDER.map(name => {
-        const found = (payload.phases || []).find(p => p.phase === name);
-        return found || { phase: name, kp: 0, deads: 0, t4: 0, t5: 0, kills: 0, empty: true };
-    });
+    const phases = PHASES.map(cfg => classifyPhase(payload.phases, cfg));
 
     const name = payload.name || fallbackName || 'Unknown';
     document.getElementById('playerName').textContent = name;
     document.getElementById('playerId').textContent = 'ID ' + (payload.id || '');
-    document.getElementById('rankBadge').textContent = phases.filter(p => !p.empty).length + ' / ' + PHASE_ORDER.length + ' fases con datos';
+    const completed = phases.filter(p => !p.missing && !p.upcoming).length;
+    document.getElementById('rankBadge').textContent = completed + ' / ' + PHASES.length + ' phases completed';
 
     const totalKp = phases.reduce((s, p) => s + (p.kp || 0), 0);
     const totalKills = phases.reduce((s, p) => s + (p.kills || 0), 0);
     const totalDeads = phases.reduce((s, p) => s + (p.deads || 0), 0);
     const bestPhase = phases.reduce((best, p) => (p.kp || 0) > (best.kp || 0) ? p : best, phases[0]);
 
-    const stepsHtml = phases.map(p => `
-<div class="tl-step ${p.empty ? 'empty' : ''}">
+    const stepsHtml = phases.map(p => {
+        const faded = p.missing || p.upcoming;
+        const statusText = p.missing ? 'No data' : (p.upcoming ? 'Upcoming' : fmt(p.kp) + ' KP');
+        const subText = faded ? '' : fmt(p.kills) + ' kills · ' + fmt(p.deads) + ' deads';
+        return `
+<div class="tl-step ${faded ? 'empty' : ''}">
   <div class="tl-dot"></div>
-  <div class="tl-phase">${esc(p.phase)}</div>
-  <div class="tl-kp">${p.empty ? 'Sin datos' : fmt(p.kp) + ' KP'}</div>
-  <div class="tl-sub">${p.empty ? '' : fmt(p.kills) + ' kills · ' + fmt(p.deads) + ' deads'}</div>
-</div>`).join('');
+  <div class="tl-phase">${esc(p.label)}</div>
+  <div class="tl-kp">${statusText}</div>
+  <div class="tl-sub">${subText}</div>
+</div>`;
+    }).join('');
 
     document.getElementById('playerContent').innerHTML = `
 <section class="cards" id="playerCards">
-  <div class="card"><div class="label">Killpoints totales</div><div class="value">${fmt(totalKp)}</div></div>
-  <div class="card"><div class="label">Kills T4+T5</div><div class="value">${fmt(totalKills)}</div></div>
+  <div class="card"><div class="label">Total killpoints</div><div class="value">${fmt(totalKp)}</div></div>
+  <div class="card"><div class="label">T4+T5 kills</div><div class="value">${fmt(totalKills)}</div></div>
   <div class="card"><div class="label">Deads</div><div class="value">${fmt(totalDeads)}</div></div>
-  <div class="card"><div class="label">Mejor fase</div><div class="value" style="font-size:20px">${esc(bestPhase.phase)}</div></div>
+  <div class="card"><div class="label">Best phase</div><div class="value" style="font-size:20px">${esc(bestPhase.label)}</div></div>
 </section>
 <div class="panel">
-  <div class="panel-head"><h2>Timeline por fases</h2><div class="small">Orden cronológico del KvK</div></div>
+  <div class="panel-head"><h2>Phase timeline</h2><div class="small">KvK chronological order</div></div>
   <div class="timeline"><div class="tl-track"></div><div class="tl-steps">${stepsHtml}</div></div>
 </div>
 <div class="panel">
-  <div class="panel-head"><h2>Killpoints por fase</h2><div class="small">Evolución a lo largo del evento</div></div>
+  <div class="panel-head"><h2>Killpoints by phase</h2><div class="small">Progress throughout the event</div></div>
   <div class="legend"><span><i class="dot" style="background:#20d6b5"></i>Killpoints</span></div>
   <div class="chart-wrap">${buildLineChart(phases, 'kp', '#20d6b5')}</div>
 </div>
 <div class="panel">
-  <div class="panel-head"><h2>Kills T4+T5 por fase</h2><div class="small">Evolución a lo largo del evento</div></div>
+  <div class="panel-head"><h2>T4+T5 kills by phase</h2><div class="small">Progress throughout the event</div></div>
   <div class="legend"><span><i class="dot" style="background:#7c5cff"></i>Kills</span></div>
   <div class="chart-wrap">${buildLineChart(phases, 'kills', '#7c5cff')}</div>
 </div>
 <div class="panel">
-  <div class="panel-head"><h2>Detalle por fase</h2></div>
-  <div class="table-wrap" style="max-height:none"><table><thead><tr><th>Fase</th><th>KP</th><th>Deads</th><th>T4</th><th>T5</th><th>Kills</th></tr></thead>
-  <tbody>${phases.map(p => `<tr><td>${esc(p.phase)}</td><td>${p.empty ? '—' : fmt(p.kp)}</td><td>${p.empty ? '—' : fmt(p.deads)}</td><td>${p.empty ? '—' : fmt(p.t4)}</td><td>${p.empty ? '—' : fmt(p.t5)}</td><td>${p.empty ? '—' : fmt(p.kills)}</td></tr>`).join('')}</tbody></table></div>
+  <div class="panel-head"><h2>Phase breakdown</h2></div>
+  <div class="table-wrap" style="max-height:none"><table><thead><tr><th>Phase</th><th>KP</th><th>Deads</th><th>T4</th><th>T5</th><th>Kills</th></tr></thead>
+  <tbody>${phases.map(p => `<tr><td>${esc(p.label)}</td><td>${p.missing ? '—' : fmt(p.kp)}</td><td>${p.missing ? '—' : fmt(p.deads)}</td><td>${p.missing ? '—' : fmt(p.t4)}</td><td>${p.missing ? '—' : fmt(p.t5)}</td><td>${p.missing ? '—' : fmt(p.kills)}</td></tr>`).join('')}</tbody></table></div>
 </div>`;
 }
 
 async function showPlayerView(id, name) {
-    document.getElementById('playerName').textContent = name || 'Cargando…';
+    document.getElementById('playerName').textContent = name || 'Loading…';
     document.getElementById('playerId').textContent = 'ID ' + id;
     document.getElementById('rankBadge').textContent = '—';
-    document.getElementById('playerContent').innerHTML = '<div class="state"><div class="spinner"></div>Cargando datos del jugador…</div>';
+    document.getElementById('playerContent').innerHTML = '<div class="state"><div class="spinner"></div>Loading player data…</div>';
 
     try {
         let payload = playerCache.get(id);
@@ -276,7 +297,7 @@ async function showPlayerView(id, name) {
         renderPlayer(payload, name);
     } catch (err) {
         console.error(err);
-        document.getElementById('playerContent').innerHTML = `<div class="state error">Error cargando datos: ${esc(err.message)}</div>`;
+        document.getElementById('playerContent').innerHTML = `<div class="state error">Error loading data: ${esc(err.message)}</div>`;
     }
 }
 
