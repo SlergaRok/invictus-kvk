@@ -43,7 +43,7 @@ td{padding:12px;border-bottom:1px solid #1c2535;text-align:right;white-space:now
 <div class="footer">Generated from INVICTUS - KVK TRACKING.xlsx • DashBoard</div>
 </div>
 <script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbxwZypD57GcsAxoiR_Jk6x4mApNnezmkECaU-JrQ1IMF5m-03SRQfxyQluZOUCiyboh/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwyz8HJGDPxR_l0-V_GSoaG1rRxQmmzCZsu1O-4B6YNvo9-vRS3Wy2L8NL215ZfSIfV/exec';
 
 let players = [];
 
@@ -77,15 +77,15 @@ function pick(row, aliases, fallback = '') {
 function mapPlayer(raw, index) {
     const row = normalizeRow(raw);
     return {
-        rank: Number(pick(row, ['rank', 'rango', '#'], index + 1)),
+        rank: Number(pick(row, ['ranking', 'rank', 'rango', '#'], index + 1)),
         id: String(pick(row, ['id', 'player id', 'governor id'], '')),
         name: String(pick(row, ['name', 'player', 'nombre'], 'Unknown')),
         power: Number(pick(row, ['power', 'power delta', 'power Δ', 'poder'], 0)),
-        kp: Number(pick(row, ['kp', 'killpoints', 'killpoint'], 0)),
+        kp: Number(pick(row, ['killpoints', 'kp', 'killpoint'], 0)),
         deads: Number(pick(row, ['deads', 'dead', 'muertos'], 0)),
-        t4: Number(pick(row, ['t4', 't4 kills'], 0)),
-        t5: Number(pick(row, ['t5', 't5 kills'], 0)),
-        kills: Number(pick(row, ['kills', 't4 + t5', 't4+t5', 't4 + t5 kills'], 0)),
+        t4: Number(pick(row, ['t4 kills', 't4'], 0)),
+        t5: Number(pick(row, ['t5 kills', 't5'], 0)),
+        kills: Number(pick(row, ['t4+t5 kills', 't4 + t5 kills', 'kills', 't4 + t5', 't4+t5'], 0)),
         contribution: Number(pick(row, ['contribution', 'contribucion', 'contribución'], 0))
     };
 }
