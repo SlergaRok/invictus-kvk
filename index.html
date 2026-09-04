@@ -44,19 +44,86 @@ td{padding:12px;border-bottom:1px solid #1c2535;text-align:right;white-space:now
 </div>
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbxwZypD57GcsAxoiR_Jk6x4mApNnezmkECaU-JrQ1IMF5m-03SRQfxyQluZOUCiyboh/exec';
+
+let players = [];
+
 async function loadData() {
     const response = await fetch(API_URL);
+    if (!response.ok) {
+        throw new Error('HTTP ' + response.status + ' al llamar al Apps Script');
+    }
     const json = await response.json();
-
-    return json.data;
+    return json.data || [];
 }
-const players= loadData();
-const fmt=n=>{n=Number(n||0);const a=Math.abs(n);if(a>=1e9)return(n/1e9).toFixed(2)+'B';if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e3)return(n/1e3).toFixed(1)+'K';return Math.round(n).toLocaleString()};
-const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-const maxC=Math.max(...players.map(p=>Number(p.contribution)||0),1);
-function renderPodium(){const top=[...players].sort((a,b)=>b.contribution-a.contribution).slice(0,3);document.getElementById('podium').innerHTML=top.map((p,i)=>`
-<div class="p"><div class="medal">${i+1}</div><div style="min-width:0;flex:1"><div class="pname">${esc(p.name)}</div><div class="pmeta">#${p.rank} • ${fmt(p.kp)} KP</div><div class="bar"><i style="width:${Math.max(4,p.contribution/maxC*100)}%"></i></div></div><div class="pvalue">${fmt(p.contribution)}</div></div>`).join('')}
-function render(){const q=document.getElementById('search').value.toLowerCase().trim();const key=document.getElementById('sort').value;let arr=players.filter(p=>p.name.toLowerCase().includes(q)||p.id.includes(q));arr.sort((a,b)=>key==='rank'?a.rank-b.rank:(Number(b[key])||0)-(Number(a[key])||0));document.getElementById('count').textContent=arr.length+' members';document.getElementById('tbody').innerHTML=arr.map(p=>`<tr><td class="rank">#${p.rank}</td><td class="name">${esc(p.name)}</td><td class="${p.power<0?'negative':'positive'}">${fmt(p.power)}</td><td>${fmt(p.kp)}</td><td>${fmt(p.deads)}</td><td>${fmt(p.t4)}</td><td>${fmt(p.t5)}</td><td>${fmt(p.kills)}</td><td class="positive">${fmt(p.contribution)}</td></tr>`).join('')}
-document.getElementById('search').addEventListener('input',render);document.getElementById('sort').addEventListener('change',render);renderPodium();render();
+
+// Normaliza cada fila: pasa todas las claves a minúsculas/sin espacios
+// para que no importe si en el Sheet la cabecera es "Name", "NAME" o "name ".
+function normalizeRow(row) {
+    const out = {};
+    Object.keys(row).forEach(k => {
+        out[k.trim().toLowerCase()] = row[k];
+    });
+    return out;
+}
+
+// Busca el primer alias disponible dentro de la fila normalizada.
+function pick(row, aliases, fallback = '') {
+    for (const a of aliases) {
+        if (row[a] !== undefined && row[a] !== '') return row[a];
+    }
+    return fallback;
+}
+
+function mapPlayer(raw, index) {
+    const row = normalizeRow(raw);
+    return {
+        rank: Number(pick(row, ['rank', 'rango', '#'], index + 1)),
+        id: String(pick(row, ['id', 'player id', 'governor id'], '')),
+        name: String(pick(row, ['name', 'player', 'nombre'], 'Unknown')),
+        power: Number(pick(row, ['power', 'power delta', 'power Δ', 'poder'], 0)),
+        kp: Number(pick(row, ['kp', 'killpoints', 'killpoint'], 0)),
+        deads: Number(pick(row, ['deads', 'dead', 'muertos'], 0)),
+        t4: Number(pick(row, ['t4', 't4 kills'], 0)),
+        t5: Number(pick(row, ['t5', 't5 kills'], 0)),
+        kills: Number(pick(row, ['kills', 't4 + t5', 't4+t5', 't4 + t5 kills'], 0)),
+        contribution: Number(pick(row, ['contribution', 'contribucion', 'contribución'], 0))
+    };
+}
+
+const fmt = n => { n = Number(n || 0); const a = Math.abs(n); if (a >= 1e9) return (n / 1e9).toFixed(2) + 'B'; if (a >= 1e6) return (n / 1e6).toFixed(2) + 'M'; if (a >= 1e3) return (n / 1e3).toFixed(1) + 'K'; return Math.round(n).toLocaleString() };
+const esc = s => String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+
+function renderPodium() {
+    const maxC = Math.max(...players.map(p => Number(p.contribution) || 0), 1);
+    const top = [...players].sort((a, b) => b.contribution - a.contribution).slice(0, 3);
+    document.getElementById('podium').innerHTML = top.map((p, i) => `
+<div class="p"><div class="medal">${i + 1}</div><div style="min-width:0;flex:1"><div class="pname">${esc(p.name)}</div><div class="pmeta">#${p.rank} • ${fmt(p.kp)} KP</div><div class="bar"><i style="width:${Math.max(4, p.contribution / maxC * 100)}%"></i></div></div><div class="pvalue">${fmt(p.contribution)}</div></div>`).join('');
+}
+
+function render() {
+    const q = document.getElementById('search').value.toLowerCase().trim();
+    const key = document.getElementById('sort').value;
+    let arr = players.filter(p => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q));
+    arr.sort((a, b) => key === 'rank' ? a.rank - b.rank : (Number(b[key]) || 0) - (Number(a[key]) || 0));
+    document.getElementById('count').textContent = arr.length + ' members';
+    document.getElementById('tbody').innerHTML = arr.map(p => `<tr><td class="rank">#${p.rank}</td><td class="name">${esc(p.name)}</td><td class="${p.power < 0 ? 'negative' : 'positive'}">${fmt(p.power)}</td><td>${fmt(p.kp)}</td><td>${fmt(p.deads)}</td><td>${fmt(p.t4)}</td><td>${fmt(p.t5)}</td><td>${fmt(p.kills)}</td><td class="positive">${fmt(p.contribution)}</td></tr>`).join('');
+}
+
+async function main() {
+    document.getElementById('tbody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted)">Cargando datos…</td></tr>';
+    try {
+        const raw = await loadData();
+        players = raw.map(mapPlayer);
+        renderPodium();
+        render();
+    } catch (err) {
+        console.error(err);
+        document.getElementById('tbody').innerHTML = `<tr><td colspan="9" style="text-align:center;color:#ff8f9b">Error cargando datos: ${esc(err.message)}</td></tr>`;
+    }
+}
+
+document.getElementById('search').addEventListener('input', render);
+document.getElementById('sort').addEventListener('change', render);
+main();
 </script>
 </body></html>
