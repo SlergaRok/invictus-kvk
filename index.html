@@ -94,15 +94,15 @@ tr.clickable{cursor:pointer}
 <div id="playerContent">
   <div class="state"><div class="spinner"></div>Loading player data…</div>
 </div>
-<div class="footer">KvK phases — chronological order: Pass 5 → Altar → Pass 6 → Kingland</div>
+<div class="footer">KvK phases — chronological order: loading…</div>
 </div>
 </div>
 
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbwyz8HJGDPxR_l0-V_GSoaG1rRxQmmzCZsu1O-4B6YNvo9-vRS3Wy2L8NL215ZfSIfV/exec';
-// Chronological KvK phases: internal sheet key -> display label.
-// KL (Kingland) hasn't happened yet, so it will show as "Upcoming" until the sheet has real values.
-const PHASES = [
+// Phase order/labels/dates now come from the API (driven by the "Schedule" sheet tab).
+// This is only a fallback used if the API response doesn't include phaseConfig yet.
+const DEFAULT_PHASES = [
     { key: 'Zone 5', label: 'Pass 5' },
     { key: 'Altars', label: 'Altar' },
     { key: 'Zone 6', label: 'Pass 6' },
@@ -225,14 +225,20 @@ function buildLineChart(phases, key, color) {
     return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">${gridLines}<path d="${area}" fill="${color}" opacity="0.12"/><path d="${path}" fill="none" stroke="${color}" stroke-width="2.5"/>${dots}${valueLabels}${labels}</svg>`;
 }
 
-function classifyPhase(payloadPhases, schedule, cfg) {
+function classifyPhase(payloadPhases, cfg) {
     const found = (payloadPhases || []).find(p => p.phase === cfg.key);
-    const dates = (schedule && schedule[cfg.key]) || null;
+    const dates = (cfg.start || cfg.end) ? { start: cfg.start, end: cfg.end } : null;
     if (!found) {
         return { ...cfg, kp: 0, deads: 0, t4: 0, t5: 0, kills: 0, missing: true, upcoming: false, dates };
     }
     const allZero = !(found.kp || found.deads || found.t4 || found.t5 || found.kills);
     return { ...cfg, kp: found.kp, deads: found.deads, t4: found.t4, t5: found.t5, kills: found.kills, missing: false, upcoming: allZero, dates };
+}
+
+function formatMge(v) {
+    if (v === null || v === undefined) return { text: '—', note: 'Not enough contribution data available yet.' };
+    if (v === 0) return { text: '0.00', note: 'No positive contribution recorded for this player.' };
+    return { text: v.toFixed(2), note: 'Contribution relative to the kingdom average among players with positive contribution (1.00 = average).' };
 }
 
 function formatDateRange(dates) {
@@ -242,19 +248,23 @@ function formatDateRange(dates) {
 }
 
 function renderPlayer(payload, fallbackName) {
-    const schedule = payload.schedule || {};
-    const phases = PHASES.map(cfg => classifyPhase(payload.phases, schedule, cfg));
+    const phaseConfig = (payload.phaseConfig && payload.phaseConfig.length) ? payload.phaseConfig : DEFAULT_PHASES;
+    const phases = phaseConfig.map(cfg => classifyPhase(payload.phases, cfg));
 
     const name = payload.name || fallbackName || 'Unknown';
     document.getElementById('playerName').textContent = name;
     document.getElementById('playerId').textContent = 'ID ' + (payload.id || '');
     const completed = phases.filter(p => !p.missing && !p.upcoming).length;
-    document.getElementById('rankBadge').textContent = completed + ' / ' + PHASES.length + ' phases completed';
+    document.getElementById('rankBadge').textContent = completed + ' / ' + phaseConfig.length + ' phases completed';
+
+    const footerEl = document.querySelector('#view-player .footer');
+    if (footerEl) footerEl.textContent = 'KvK phases — chronological order: ' + phaseConfig.map(p => p.label).join(' → ');
 
     const totalKp = phases.reduce((s, p) => s + (p.kp || 0), 0);
     const totalKills = phases.reduce((s, p) => s + (p.kills || 0), 0);
     const totalDeads = phases.reduce((s, p) => s + (p.deads || 0), 0);
     const bestPhase = phases.reduce((best, p) => (p.kp || 0) > (best.kp || 0) ? p : best, phases[0]);
+    const mge = formatMge(payload.mgePoints);
 
     const stepsHtml = phases.map(p => {
         const faded = p.missing || p.upcoming;
@@ -278,6 +288,13 @@ function renderPlayer(payload, fallbackName) {
   <div class="card"><div class="label">Deads</div><div class="value">${fmt(totalDeads)}</div></div>
   <div class="card"><div class="label">Best phase</div><div class="value" style="font-size:20px">${esc(bestPhase.label)}</div></div>
 </section>
+<div class="panel">
+  <div class="panel-head"><h2>MGE points</h2><div class="small">Contribution vs. kingdom average</div></div>
+  <div style="padding:22px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+    <div style="font-size:36px;font-weight:800;color:var(--accent2)">${mge.text}</div>
+    <div class="small" style="max-width:380px">${esc(mge.note)}</div>
+  </div>
+</div>
 <div class="panel">
   <div class="panel-head"><h2>Phase timeline</h2><div class="small">KvK chronological order</div></div>
   <div class="timeline"><div class="tl-track"></div><div class="tl-steps">${stepsHtml}</div></div>
