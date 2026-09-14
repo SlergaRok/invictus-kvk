@@ -235,10 +235,13 @@ function classifyPhase(payloadPhases, cfg) {
     return { ...cfg, kp: found.kp, deads: found.deads, t4: found.t4, t5: found.t5, kills: found.kills, missing: false, upcoming: allZero, dates };
 }
 
-function formatMge(v) {
+function formatMge(v, farmOf, farmOfName) {
+    if (farmOf) {
+        const mainRef = farmOfName ? farmOfName + ' (ID ' + farmOf + ')' : 'ID ' + farmOf;
+        return { text: '—', note: 'This is a farm account — its points count towards its main account, ' + mainRef + '.' };
+    }
     if (v === null || v === undefined) return { text: '—', note: 'Not enough contribution data available yet.' };
-    if (v === 0) return { text: '0.00', note: 'No positive contribution recorded for this player.' };
-    return { text: v.toFixed(2), note: 'Contribution relative to the kingdom average among players with positive contribution (1.00 = average).' };
+    return { text: v.toFixed(2), note: 'Total contribution (own account plus any linked farm accounts) divided by 1,000,000.' };
 }
 
 function formatDateRange(dates) {
@@ -264,7 +267,7 @@ function renderPlayer(payload, fallbackName) {
     const totalKills = phases.reduce((s, p) => s + (p.kills || 0), 0);
     const totalDeads = phases.reduce((s, p) => s + (p.deads || 0), 0);
     const bestPhase = phases.reduce((best, p) => (p.kp || 0) > (best.kp || 0) ? p : best, phases[0]);
-    const mge = formatMge(payload.mgePoints);
+    const mge = formatMge(payload.mgePoints, payload.mgeFarmOf, payload.mgeFarmOfName);
 
     const stepsHtml = phases.map(p => {
         const faded = p.missing || p.upcoming;
