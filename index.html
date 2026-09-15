@@ -241,7 +241,7 @@ function formatMge(v, farmOf, farmOfName) {
         return { text: '—', note: 'This is a farm account — its points count towards its main account, ' + mainRef + '.' };
     }
     if (v === null || v === undefined) return { text: '—', note: 'Not enough contribution data available yet.' };
-    return { text: v.toFixed(2), note: 'Total contribution (own account plus any linked farm accounts) divided by 1,000,000.' };
+    return { text: v.toFixed(2), note: 'Total contribution (own account plus any linked farm accounts)' };
 }
 
 function formatDateRange(dates) {
