@@ -67,6 +67,9 @@ th.cur-col,td.cur-col{background:#0f1a1f}
 .plink{cursor:pointer;font-weight:700}.plink:hover{color:var(--accent2)}
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--line)}
 .stat-grid>div{background:var(--panel);padding:16px 20px}.stat-grid .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}.stat-grid .v{font-size:20px;font-weight:800;margin-top:6px}
+.cards-5{grid-template-columns:repeat(5,1fr)}.cards-5 .value{font-size:26px}
+@media(max-width:1200px){.cards-5{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){.cards-5{grid-template-columns:1fr 1fr}}
 .notice{margin:0 0 18px;padding:12px 16px;border-radius:12px;border:1px dashed #3a4660;color:var(--muted);font-size:12px;line-height:1.5}
 
 /* --- Vista de jugador --- */
@@ -165,9 +168,10 @@ th.cur-col,td.cur-col{background:#0f1a1f}
 <div class="container">
 <div class="header"><div><div class="eyebrow">INVICTUS • PLAYER STATS</div><h1>Players</h1><div class="subtitle">Power, kills and role of every member.</div></div><div class="badge" id="playersBadge">—</div></div>
 <div id="playersNotice"></div>
-<section class="cards">
+<section class="cards cards-5">
 <div class="card"><div class="label" id="psPowerLabel">Total power</div><div class="value" id="psPower">—</div></div>
-<div class="card"><div class="label">T4 + T5 Kills</div><div class="value" id="psKills">—</div></div>
+<div class="card"><div class="label">Total Killpoints</div><div class="value" id="psKp">—</div></div>
+<div class="card"><div class="label">Total Deads</div><div class="value" id="psDeads">—</div></div>
 <div class="card"><div class="label">Rally leaders</div><div class="value" style="color:var(--rally)" id="psRally">—</div></div>
 <div class="card"><div class="label">Garrison leaders</div><div class="value" style="color:var(--garrison)" id="psGarrison">—</div></div>
 </section>
@@ -382,6 +386,19 @@ function ensureMge() {
     return mgePromise;
 }
 
+// Progreso de un requisito (KP o Deads) con los datos del DashBoard del KvK. null si no hay datos.
+function reqProgress(id, target, key) {
+    if (!target) return null;
+    const row = players.find(x => x.id === String(id));
+    if (!row) return null;
+    const done = Number(row[key]) || 0;
+    return { done, pct: Math.round(done / target * 100) };
+}
+const reqCell = (id, target, key) => {
+    const r = reqProgress(id, target, key);
+    return optFmt(target) + (r ? ` <span class="small" style="color:${r.pct >= 100 ? '#5ee3c5' : 'var(--muted)'}">${r.pct}%</span>` : '');
+};
+
 // Eventos MGE: el actual de cada tipo y la etiqueta legible de cada uno.
 const currentEvents = () => (mgeData ? mgeData.events.filter(e => e.current) : []);
 const blockLabel = name => String(name || 'MGE').replace(/^mge\s*/i, '').trim() || 'MGE';
@@ -469,7 +486,7 @@ function renderStatsTable() {
     let arr = statPlayers.filter(p => (p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)) && (psRole === 'all' || p.roles.includes(psRole)));
     arr.sort((a, b) => key === 'name' ? a.name.localeCompare(b.name) : (Number(b[key]) || 0) - (Number(a[key]) || 0));
     document.getElementById('psCount').textContent = arr.length + ' members';
-    document.getElementById('psBody').innerHTML = arr.length ? arr.map((p, i) => `<tr class="clickable"><td class="rank">${i + 1}</td><td class="name">${esc(p.name)}</td><td class="left">${p.roles.length ? roleBadges(p.roles) : '<span class="role-none">—</span>'}</td><td class="${statsFromDashboard ? (p.power < 0 ? 'negative' : 'positive') : ''}">${fmt(p.power)}</td><td>${fmt(p.kp)}</td><td>${fmt(p.t4)}</td><td>${fmt(p.t5)}</td><td>${fmt(p.kills)}</td><td>${fmt(p.deads)}</td><td>${optFmt(p.acclaim)}</td><td>${optFmt(p.kpReq)}</td><td>${optFmt(p.deathReq)}</td></tr>`).join('')
+    document.getElementById('psBody').innerHTML = arr.length ? arr.map((p, i) => `<tr class="clickable"><td class="rank">${i + 1}</td><td class="name">${esc(p.name)}</td><td class="left">${p.roles.length ? roleBadges(p.roles) : '<span class="role-none">—</span>'}</td><td class="${statsFromDashboard ? (p.power < 0 ? 'negative' : 'positive') : ''}">${fmt(p.power)}</td><td>${fmt(p.kp)}</td><td>${fmt(p.t4)}</td><td>${fmt(p.t5)}</td><td>${fmt(p.kills)}</td><td>${fmt(p.deads)}</td><td>${optFmt(p.acclaim)}</td><td>${reqCell(p.id, p.kpReq, 'kp')}</td><td>${reqCell(p.id, p.deathReq, 'deads')}</td></tr>`).join('')
         : `<tr><td colspan="12" style="text-align:center;color:var(--muted);padding:30px">No members match this filter.</td></tr>`;
     document.querySelectorAll('#psBody tr.clickable').forEach((el, i) => {
         el.addEventListener('click', () => goToPlayer(arr[i].id, arr[i].name));
@@ -481,7 +498,7 @@ async function renderStats() {
     if (statsRendered) return;
     document.getElementById('psBody').innerHTML = loadingRow(12);
     try {
-        await ensureStats();
+        await Promise.all([ensureStats(), ensureDashboard().catch(console.error)]); // DashBoard: % de requisitos
         const rally = statPlayers.filter(p => p.roles.includes('rally')).length;
         const garrison = statPlayers.filter(p => p.roles.includes('garrison')).length;
         const anyRoles = rally + garrison > 0;
@@ -491,7 +508,8 @@ async function renderStats() {
         document.querySelector('#psSort option[value="power"]').textContent = powerLabel;
         document.getElementById('playersBadge').textContent = statPlayers.length + ' members';
         document.getElementById('psPower').textContent = fmt(sum(statPlayers, 'power'));
-        document.getElementById('psKills').textContent = fmt(sum(statPlayers, 'kills'));
+        document.getElementById('psKp').textContent = fmt(sum(statPlayers, 'kp'));
+        document.getElementById('psDeads').textContent = fmt(sum(statPlayers, 'deads'));
         document.getElementById('psRally').textContent = anyRoles ? rally : '—';
         document.getElementById('psGarrison').textContent = anyRoles ? garrison : '—';
         const notes = [];
@@ -658,13 +676,15 @@ function formatDateRange(dates) {
 }
 
 // Stats de la pestaña Players (poder actual, acclaim, requisitos). Vacío si no hay API de jugadores.
-function playerStatsPanel(id, kvkKp, kvkDeads) {
+function playerStatsPanel(id) {
     const p = !statsFromDashboard && statPlayers ? statPlayers.find(x => x.id === String(id)) : null;
     if (!p) return '';
-    const req = (done, target) => {
-        if (!target) return optFmt(target);
-        const pct = Math.round(done / target * 100);
-        return `${fmt(target)} <span class="small" style="font-weight:600;color:${pct >= 100 ? '#5ee3c5' : 'var(--muted)'}">· ${pct}% done</span>`;
+    const req = (target, key) => {
+        const r = reqProgress(id, target, key);
+        if (!r) return optFmt(target);
+        return `${fmt(target)} <span class="small" style="font-weight:600;color:${r.pct >= 100 ? '#5ee3c5' : 'var(--muted)'}">· ${r.pct}% done</span>
+<div class="bar" style="margin-top:8px"><i style="width:${Math.min(100, r.pct)}%"></i></div>
+<div class="small" style="margin-top:4px;font-weight:400">${fmt(r.done)} in KvK DashBoard</div>`;
     };
     return `
 <div class="panel">
@@ -673,8 +693,8 @@ function playerStatsPanel(id, kvkKp, kvkDeads) {
     <div><div class="label">Power</div><div class="v">${fmt(p.power)}</div></div>
     <div><div class="label">Acclaim</div><div class="v">${optFmt(p.acclaim)}</div></div>
     <div><div class="label">Highest acclaim</div><div class="v">${optFmt(p.highestAcclaim)}</div></div>
-    <div><div class="label">KP requirement</div><div class="v">${req(kvkKp, p.kpReq)}</div></div>
-    <div><div class="label">Deads requirement</div><div class="v">${req(kvkDeads, p.deathReq)}</div></div>
+    <div><div class="label">KP requirement (next KvK)</div><div class="v">${req(p.kpReq, 'kp')}</div></div>
+    <div><div class="label">Deads requirement (next KvK)</div><div class="v">${req(p.deathReq, 'deads')}</div></div>
   </div>
 </div>`;
 }
@@ -752,7 +772,7 @@ function renderPlayer(payload, fallbackName) {
   <div class="card"><div class="label">Deads</div><div class="value">${fmt(totalDeads)}</div></div>
   <div class="card"><div class="label">Best phase</div><div class="value" style="font-size:20px">${esc(bestPhase.label)}</div></div>
 </section>
-${playerStatsPanel(payload.id, totalKp, totalDeads)}
+${playerStatsPanel(payload.id)}
 ${playerMgePanel(payload.id, name, payload, mge)}
 <div class="panel">
   <div class="panel-head"><h2>Phase timeline</h2><div class="small">KvK chronological order</div></div>
@@ -783,7 +803,7 @@ async function showPlayerView(id, name) {
     document.getElementById('playerContent').innerHTML = '<div class="state"><div class="spinner"></div>Loading player data…</div>';
 
     // Stats y MGE vienen de la otra API; si fallan, el perfil se muestra igual sin esos paneles.
-    const extras = DATA_API_URL ? Promise.all([ensureStats().catch(console.error), ensureMge().catch(console.error)]) : Promise.resolve();
+    const extras = DATA_API_URL ? Promise.all([ensureStats().catch(console.error), ensureMge().catch(console.error), ensureDashboard().catch(console.error)]) : Promise.resolve();
     try {
         let payload = playerCache.get(id);
         if (!payload) {
