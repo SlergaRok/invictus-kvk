@@ -80,7 +80,9 @@ th.cur-col,td.cur-col{background:#0f1a1f}
 .back .arrow{color:var(--accent2);font-size:15px}
 .state{padding:70px 20px;text-align:center;color:var(--muted)}
 .error{color:var(--red)}
-#playerCards .value{font-size:24px}
+#kpContent .cards .value{font-size:24px}
+.jump{display:inline-flex;align-items:center;gap:8px;font-family:inherit;font-size:13px;font-weight:800;color:var(--text);background:#0f1a1f;border:1px solid var(--accent2);border-radius:12px;padding:10px 16px;cursor:pointer;white-space:nowrap;transition:background .15s,transform .1s}
+.jump:hover{background:#132a2a}.jump:active{transform:translateY(1px)}.jump .arrow{color:var(--accent2)}
 .timeline{padding:26px 24px 10px;position:relative}
 .tl-track{position:absolute;left:44px;right:44px;top:38px;height:2px;background:var(--line)}
 .tl-steps{display:flex;justify-content:space-between;position:relative;gap:8px}
@@ -207,22 +209,44 @@ th.cur-col,td.cur-col{background:#0f1a1f}
 </div>
 </div>
 
-<!-- ===== Vista: Detalle de jugador ===== -->
+<!-- ===== Vista: Perfil del jugador (datos actuales: pestaña Players + MGE) ===== -->
 <div id="view-player" class="view">
 <div class="container">
-<button class="back" id="backBtn"><span class="arrow">←</span> Back</button>
+<button class="back" data-back><span class="arrow">←</span> Back</button>
 <div class="header">
   <div>
     <div class="eyebrow">INVICTUS • PLAYER PROFILE</div>
-    <h1><span id="playerName">Loading…</span><span id="playerRoles"></span></h1>
-    <div class="subtitle" id="playerId"></div>
+    <h1><span id="ppName">Loading…</span><span id="ppRoles"></span></h1>
+    <div class="subtitle" id="ppId"></div>
   </div>
-  <div class="badge" id="rankBadge">—</div>
+  <button class="jump" id="ppJump">View KvK performance <span class="arrow">→</span></button>
 </div>
-<div id="playerContent">
+<div id="ppContent">
   <div class="state"><div class="spinner"></div>Loading player data…</div>
 </div>
-<div class="footer">KvK phases — chronological order: loading…</div>
+<div class="footer">Current data from the Players tab</div>
+</div>
+</div>
+
+<!-- ===== Vista: Desempeño del jugador en el KvK (solo datos del DashBoard) ===== -->
+<div id="view-kvkplayer" class="view">
+<div class="container">
+<button class="back" data-back><span class="arrow">←</span> Back</button>
+<div class="header">
+  <div>
+    <div class="eyebrow">INVICTUS • KVK PERFORMANCE</div>
+    <h1><span id="kpName">Loading…</span><span id="kpRoles"></span></h1>
+    <div class="subtitle" id="kpId"></div>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <div class="badge" id="kpBadge">—</div>
+    <button class="jump" id="kpJump">View player profile <span class="arrow">→</span></button>
+  </div>
+</div>
+<div id="kpContent">
+  <div class="state"><div class="spinner"></div>Loading KvK data…</div>
+</div>
+<div class="footer" id="kpFooter">KvK phases — chronological order: loading…</div>
 </div>
 </div>
 
@@ -437,7 +461,7 @@ function renderPodium() {
     document.getElementById('podium').innerHTML = top.map((p, i) => `
 <div class="p clickable"><div class="medal">${i + 1}</div><div style="min-width:0;flex:1"><div class="pname">${esc(p.name)}</div><div class="pmeta">#${p.rank} • ${fmt(p.kp)} KP</div><div class="bar"><i style="width:${Math.max(4, p.contribution / maxC * 100)}%"></i></div></div><div class="pvalue">${fmt(p.contribution)}</div></div>`).join('');
     document.querySelectorAll('#podium .p').forEach((el, i) => {
-        el.addEventListener('click', () => goToPlayer(top[i].id, top[i].name));
+        el.addEventListener('click', () => goToKvkPlayer(top[i].id, top[i].name));
     });
 }
 
@@ -449,7 +473,7 @@ function renderTable() {
     document.getElementById('count').textContent = arr.length + ' members';
     document.getElementById('tbody').innerHTML = arr.map(p => `<tr class="clickable"><td class="rank">#${p.rank}</td><td class="name">${esc(p.name)}</td><td class="${p.power < 0 ? 'negative' : 'positive'}">${fmt(p.power)}</td><td>${fmt(p.kp)}</td><td>${fmt(p.deads)}</td><td>${fmt(p.t4)}</td><td>${fmt(p.t5)}</td><td>${fmt(p.kills)}</td><td class="positive">${fmt(p.contribution)}</td></tr>`).join('');
     document.querySelectorAll('#tbody tr').forEach((el, i) => {
-        el.addEventListener('click', () => goToPlayer(arr[i].id, arr[i].name));
+        el.addEventListener('click', () => goToKvkPlayer(arr[i].id, arr[i].name));
     });
 }
 
@@ -660,56 +684,25 @@ function classifyPhase(payloadPhases, cfg) {
     return { ...cfg, kp: found.kp, deads: found.deads, t4: found.t4, t5: found.t5, kills: found.kills, missing: false, upcoming: allZero, dates };
 }
 
-function formatMge(v, farmOf, farmOfName) {
-    if (farmOf) {
-        const mainRef = farmOfName ? farmOfName + ' (ID ' + farmOf + ')' : 'ID ' + farmOf;
-        return { text: '—', note: 'This is a farm account — its points count towards its main account, ' + mainRef + '.' };
-    }
-    if (v === null || v === undefined) return { text: '—', note: 'Not enough contribution data available yet.' };
-    return { text: String(Math.ceil(v)), note: 'Total contribution (own account plus any linked farm accounts) divided by 1,000,000, rounded up.' };
-}
-
 function formatDateRange(dates) {
     if (!dates || (!dates.start && !dates.end)) return '';
     if (dates.start && dates.end) return dates.start + ' – ' + dates.end;
     return dates.start || dates.end;
 }
 
-// Stats de la pestaña Players (poder actual, acclaim, requisitos). Vacío si no hay API de jugadores.
-function playerStatsPanel(id) {
-    const p = !statsFromDashboard && statPlayers ? statPlayers.find(x => x.id === String(id)) : null;
-    if (!p) return '';
-    const req = (target, key) => {
-        const r = reqProgress(id, target, key);
-        if (!r) return optFmt(target);
-        return `${fmt(target)} <span class="small" style="font-weight:600;color:${r.pct >= 100 ? '#5ee3c5' : 'var(--muted)'}">· ${r.pct}% done</span>
-<div class="bar" style="margin-top:8px"><i style="width:${Math.min(100, r.pct)}%"></i></div>
-<div class="small" style="margin-top:4px;font-weight:400">${fmt(r.done)} in KvK DashBoard</div>`;
-    };
-    return `
-<div class="panel">
-  <div class="panel-head"><h2>Player stats</h2><div class="small">Players tab</div></div>
-  <div class="stat-grid">
-    <div><div class="label">Power</div><div class="v">${fmt(p.power)}</div></div>
-    <div><div class="label">Acclaim</div><div class="v">${optFmt(p.acclaim)}</div></div>
-    <div><div class="label">Highest acclaim</div><div class="v">${optFmt(p.highestAcclaim)}</div></div>
-    <div><div class="label">KP requirement (next KvK)</div><div class="v">${req(p.kpReq, 'kp')}</div></div>
-    <div><div class="label">Deads requirement (next KvK)</div><div class="v">${req(p.deathReq, 'deads')}</div></div>
-  </div>
-</div>`;
-}
+const stateBox = (html, cls = '') => `<div class="state ${cls}">${html}</div>`;
 
-// Saldo MGE y puestos conseguidos en este KvK. Sin hoja MGE conectada, muestra los puntos del KvK como antes.
-function playerMgePanel(id, name, payload, mge) {
-    const bal = mgeData && !mgeEstimated ? mgeData.balances.find(b => b.id === String(id)) : null;
-    if (!bal || payload.mgeFarmOf) {
+/* ---------------- Vista: Perfil del jugador (datos actuales) ---------------- */
+
+// Saldo MGE y puestos conseguidos en este KvK. Vacío si la hoja MGE no está conectada.
+function playerMgePanel(id) {
+    if (!mgeData || mgeEstimated) return '';
+    const bal = mgeData.balances.find(b => b.id === String(id));
+    if (!bal) {
         return `
 <div class="panel">
-  <div class="panel-head"><h2>MGE points</h2><div class="small">This KvK</div></div>
-  <div style="padding:22px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
-    <div style="font-size:36px;font-weight:800;color:var(--accent2)">${mge.text}</div>
-    <div class="small" style="max-width:380px">${esc(mge.note)}</div>
-  </div>
+  <div class="panel-head"><h2>MGE</h2><div class="small">Points reset every KvK</div></div>
+  <div class="small" style="padding:18px 20px">No MGE balance for this account. Farm accounts add their points to their main account.</div>
 </div>`;
     }
     const won = mgeData.events.flatMap(e => e.assignments
@@ -729,26 +722,83 @@ function playerMgePanel(id, name, payload, mge) {
 </div>`;
 }
 
-function renderPlayer(payload, fallbackName) {
+async function showPlayerProfile(id, name) {
+    document.getElementById('ppName').textContent = name || 'Loading…';
+    document.getElementById('ppRoles').innerHTML = roleBadges(knownRoles(id));
+    document.getElementById('ppId').textContent = 'ID ' + id;
+    const content = document.getElementById('ppContent');
+    content.innerHTML = stateBox('<div class="spinner"></div>Loading player data…');
+
+    try {
+        await Promise.all([ensureStats(), ensureMge().catch(console.error)]);
+        const p = statsFromDashboard ? null : statPlayers.find(x => x.id === String(id));
+        if (p) {
+            document.getElementById('ppName').textContent = p.name;
+            document.getElementById('ppRoles').innerHTML = roleBadges(p.roles);
+        }
+        const statsHtml = p ? `
+<section class="cards cards-5">
+  <div class="card"><div class="label">Power</div><div class="value">${fmt(p.power)}</div></div>
+  <div class="card"><div class="label">Killpoints</div><div class="value">${fmt(p.kp)}</div></div>
+  <div class="card"><div class="label">Deads</div><div class="value">${fmt(p.deads)}</div></div>
+  <div class="card"><div class="label">T4 + T5 kills</div><div class="value">${fmt(p.kills)}</div></div>
+  <div class="card"><div class="label">Acclaim</div><div class="value">${optFmt(p.acclaim)}</div></div>
+</section>
+<div class="panel">
+  <div class="panel-head"><h2>Details</h2><div class="small">Players tab</div></div>
+  <div class="stat-grid">
+    <div><div class="label">T4 kills</div><div class="v">${fmt(p.t4)}</div></div>
+    <div><div class="label">T5 kills</div><div class="v">${fmt(p.t5)}</div></div>
+    <div><div class="label">Highest acclaim</div><div class="v">${optFmt(p.highestAcclaim)}</div></div>
+    <div><div class="label">KP requirement (next KvK)</div><div class="v">${optFmt(p.kpReq)}</div></div>
+    <div><div class="label">Deads requirement (next KvK)</div><div class="v">${optFmt(p.deathReq)}</div></div>
+  </div>
+</div>` : `<div class="panel">${stateBox(statsFromDashboard ? 'The Players sheet is not connected yet.' : 'This player is not in the Players tab.')}</div>`;
+        content.innerHTML = statsHtml + playerMgePanel(id);
+    } catch (err) {
+        console.error(err);
+        content.innerHTML = stateBox('Error loading data: ' + esc(err.message), 'error');
+    }
+}
+
+/* ---------------- Vista: Desempeño del jugador en el KvK (DashBoard) ---------------- */
+
+// Progreso hacia los requisitos del próximo KvK (objetivos de la pestaña Players, progreso del DashBoard).
+function kvkRequirementsPanel(id) {
+    const p = !statsFromDashboard && statPlayers ? statPlayers.find(x => x.id === String(id)) : null;
+    if (!p || (!p.kpReq && !p.deathReq)) return '';
+    const req = (label, target, key) => {
+        const r = reqProgress(id, target, key);
+        if (!r) return `<div><div class="label">${label}</div><div class="v">${optFmt(target)}</div></div>`;
+        return `<div><div class="label">${label}</div>
+<div class="v">${r.pct}% <span class="small" style="font-weight:600;color:${r.pct >= 100 ? '#5ee3c5' : 'var(--muted)'}">· ${fmt(r.done)} / ${fmt(target)}</span></div>
+<div class="bar" style="margin-top:8px"><i style="width:${Math.min(100, r.pct)}%"></i></div></div>`;
+    };
+    return `
+<div class="panel">
+  <div class="panel-head"><h2>Requirements</h2><div class="small">Next KvK targets vs. DashBoard</div></div>
+  <div class="stat-grid">
+    ${req('Killpoints', p.kpReq, 'kp')}
+    ${req('Deads', p.deathReq, 'deads')}
+  </div>
+</div>`;
+}
+
+function renderKvkProfile(payload, fallbackName) {
     const phaseConfig = (payload.phaseConfig && payload.phaseConfig.length) ? payload.phaseConfig : DEFAULT_PHASES;
     const phases = phaseConfig.map(cfg => classifyPhase(payload.phases, cfg));
+    const row = players.find(x => x.id === String(payload.id));
 
-    const name = payload.name || fallbackName || 'Unknown';
-    document.getElementById('playerName').textContent = name;
-    document.getElementById('playerId').textContent = 'ID ' + (payload.id || '');
-    const roles = payload.role ? parseRoles(payload.role) : knownRoles(payload.id);
-    document.getElementById('playerRoles').innerHTML = roleBadges(roles);
+    document.getElementById('kpName').textContent = payload.name || fallbackName || 'Unknown';
+    document.getElementById('kpId').textContent = 'ID ' + (payload.id || '');
+    document.getElementById('kpRoles').innerHTML = roleBadges(payload.role ? parseRoles(payload.role) : knownRoles(payload.id));
     const completed = phases.filter(p => !p.missing && !p.upcoming).length;
-    document.getElementById('rankBadge').textContent = completed + ' / ' + phaseConfig.length + ' phases completed';
+    document.getElementById('kpBadge').textContent = (row ? 'Rank #' + row.rank + ' · ' : '') + completed + ' / ' + phaseConfig.length + ' phases';
+    document.getElementById('kpFooter').textContent = 'KvK phases — chronological order: ' + phaseConfig.map(p => p.label).join(' → ');
 
-    const footerEl = document.querySelector('#view-player .footer');
-    if (footerEl) footerEl.textContent = 'KvK phases — chronological order: ' + phaseConfig.map(p => p.label).join(' → ');
-
-    const totalKp = phases.reduce((s, p) => s + (p.kp || 0), 0);
-    const totalKills = phases.reduce((s, p) => s + (p.kills || 0), 0);
-    const totalDeads = phases.reduce((s, p) => s + (p.deads || 0), 0);
+    // Totales de la fila del DashBoard; si el jugador no está, se suman las fases.
+    const total = key => row ? row[key] : phases.reduce((s, p) => s + (p[key] || 0), 0);
     const bestPhase = phases.reduce((best, p) => (p.kp || 0) > (best.kp || 0) ? p : best, phases[0]);
-    const mge = formatMge(payload.mgePoints, payload.mgeFarmOf, payload.mgeFarmOfName);
 
     const stepsHtml = phases.map(p => {
         const faded = p.missing || p.upcoming;
@@ -765,15 +815,15 @@ function renderPlayer(payload, fallbackName) {
 </div>`;
     }).join('');
 
-    document.getElementById('playerContent').innerHTML = `
-<section class="cards" id="playerCards">
-  <div class="card"><div class="label">Total killpoints</div><div class="value">${fmt(totalKp)}</div></div>
-  <div class="card"><div class="label">T4+T5 kills</div><div class="value">${fmt(totalKills)}</div></div>
-  <div class="card"><div class="label">Deads</div><div class="value">${fmt(totalDeads)}</div></div>
+    document.getElementById('kpContent').innerHTML = `
+<section class="cards cards-5">
+  <div class="card"><div class="label">Killpoints</div><div class="value">${fmt(total('kp'))}</div></div>
+  <div class="card"><div class="label">T4+T5 kills</div><div class="value">${fmt(total('kills'))}</div></div>
+  <div class="card"><div class="label">Deads</div><div class="value">${fmt(total('deads'))}</div></div>
+  <div class="card"><div class="label">Contribution</div><div class="value">${row ? fmt(row.contribution) : '—'}</div></div>
   <div class="card"><div class="label">Best phase</div><div class="value" style="font-size:20px">${esc(bestPhase.label)}</div></div>
 </section>
-${playerStatsPanel(payload.id)}
-${playerMgePanel(payload.id, name, payload, mge)}
+${kvkRequirementsPanel(payload.id)}
 <div class="panel">
   <div class="panel-head"><h2>Phase timeline</h2><div class="small">KvK chronological order</div></div>
   <div class="timeline"><div class="tl-track"></div><div class="tl-steps">${stepsHtml}</div></div>
@@ -795,15 +845,15 @@ ${playerMgePanel(payload.id, name, payload, mge)}
 </div>`;
 }
 
-async function showPlayerView(id, name) {
-    document.getElementById('playerName').textContent = name || 'Loading…';
-    document.getElementById('playerRoles').innerHTML = roleBadges(knownRoles(id));
-    document.getElementById('playerId').textContent = 'ID ' + id;
-    document.getElementById('rankBadge').textContent = '—';
-    document.getElementById('playerContent').innerHTML = '<div class="state"><div class="spinner"></div>Loading player data…</div>';
+async function showKvkProfile(id, name) {
+    document.getElementById('kpName').textContent = name || 'Loading…';
+    document.getElementById('kpRoles').innerHTML = roleBadges(knownRoles(id));
+    document.getElementById('kpId').textContent = 'ID ' + id;
+    document.getElementById('kpBadge').textContent = '—';
+    document.getElementById('kpContent').innerHTML = stateBox('<div class="spinner"></div>Loading KvK data…');
 
-    // Stats y MGE vienen de la otra API; si fallan, el perfil se muestra igual sin esos paneles.
-    const extras = DATA_API_URL ? Promise.all([ensureStats().catch(console.error), ensureMge().catch(console.error), ensureDashboard().catch(console.error)]) : Promise.resolve();
+    // La pestaña Players solo aporta los objetivos de requisitos; si falla, la vista sale igual.
+    const extras = Promise.all([ensureDashboard(), DATA_API_URL ? ensureStats().catch(console.error) : null]);
     try {
         let payload = playerCache.get(id);
         if (!payload) {
@@ -811,49 +861,59 @@ async function showPlayerView(id, name) {
             playerCache.set(id, payload);
         }
         await extras;
-        renderPlayer(payload, name);
+        renderKvkProfile(payload, name);
     } catch (err) {
         console.error(err);
-        document.getElementById('playerContent').innerHTML = `<div class="state error">Error loading data: ${esc(err.message)}</div>`;
+        document.getElementById('kpContent').innerHTML = stateBox('Error loading data: ' + esc(err.message), 'error');
     }
 }
 
 /* ---------------- Router (cambia de vista sin recargar, con botón atrás) ---------------- */
 
-const VIEWS = ['home', 'kvk', 'players', 'mge', 'player'];
+const VIEWS = ['home', 'kvk', 'players', 'mge', 'player', 'kvkplayer'];
+const PROFILE_VIEWS = { player: { param: 'player', show: showPlayerProfile }, kvkplayer: { param: 'kvk', show: showKvkProfile } };
 const RENDERERS = { home: renderHome, kvk: renderKvk, players: renderStats, mge: renderMge };
-let previousView = null; // vista desde la que se abrió el perfil, para el botón "Back"
+const isProfile = view => view in PROFILE_VIEWS;
+let previousView = null; // lista desde la que se abrió un perfil, para el botón "Back"
+let currentProfile = null; // { id, name } del perfil abierto, para saltar entre las dos vistas
 
 function urlFor(state) {
-    if (state.view === 'player') return '?player=' + encodeURIComponent(state.id) + (state.name ? '&name=' + encodeURIComponent(state.name) : '');
+    if (isProfile(state.view)) return '?' + PROFILE_VIEWS[state.view].param + '=' + encodeURIComponent(state.id) + (state.name ? '&name=' + encodeURIComponent(state.name) : '');
     if (state.view === 'home') return location.pathname;
     return '?view=' + state.view;
 }
 
 function stateFromUrl() {
     const params = new URLSearchParams(location.search);
-    if (params.get('player')) return { view: 'player', id: params.get('player'), name: params.get('name') };
+    for (const [view, cfg] of Object.entries(PROFILE_VIEWS)) {
+        if (params.get(cfg.param)) return { view, id: params.get(cfg.param), name: params.get('name') };
+    }
     const view = params.get('view');
-    return { view: VIEWS.includes(view) && view !== 'player' ? view : 'home' };
+    return { view: VIEWS.includes(view) && !isProfile(view) ? view : 'home' };
 }
 
 function show(state, push) {
-    if (state.view !== 'player' && currentView !== 'player') previousView = null;
-    if (state.view === 'player' && currentView && currentView !== 'player') previousView = currentView;
+    if (!isProfile(state.view) && !isProfile(currentView)) previousView = null;
+    if (isProfile(state.view) && currentView && !isProfile(currentView)) previousView = currentView;
     currentView = state.view;
 
     VIEWS.forEach(v => document.getElementById('view-' + v).classList.toggle('active', v === state.view));
-    const navKey = state.view === 'player' ? previousView : state.view;
+    const navKey = isProfile(state.view) ? previousView : state.view;
     document.querySelectorAll('.nav a').forEach(a => a.classList.toggle('active', a.dataset.nav === navKey));
     window.scrollTo(0, 0);
 
     if (push) history.pushState(state, '', urlFor(state));
-    if (state.view === 'player') showPlayerView(state.id, state.name);
-    else RENDERERS[state.view]();
+    if (isProfile(state.view)) {
+        currentProfile = { id: state.id, name: state.name };
+        PROFILE_VIEWS[state.view].show(state.id, state.name);
+    } else {
+        RENDERERS[state.view]();
+    }
 }
 
 function navigate(view) { show({ view }, true); }
 function goToPlayer(id, name) { show({ view: 'player', id, name }, true); }
+function goToKvkPlayer(id, name) { show({ view: 'kvkplayer', id, name }, true); }
 
 document.querySelectorAll('[data-nav]').forEach(a => a.addEventListener('click', e => {
     if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return; // dejar abrir en pestaña nueva
@@ -861,11 +921,14 @@ document.querySelectorAll('[data-nav]').forEach(a => a.addEventListener('click',
     navigate(a.dataset.nav);
 }));
 
-document.getElementById('backBtn').addEventListener('click', () => {
+document.querySelectorAll('[data-back]').forEach(btn => btn.addEventListener('click', () => {
     // Si venimos de otra vista de la web, volvemos con el historial; si se entró por enlace directo, a la landing.
     if (previousView) history.back();
     else navigate('home');
-});
+}));
+
+document.getElementById('ppJump').addEventListener('click', () => goToKvkPlayer(currentProfile.id, currentProfile.name));
+document.getElementById('kpJump').addEventListener('click', () => goToPlayer(currentProfile.id, currentProfile.name));
 
 window.addEventListener('popstate', e => show(e.state || stateFromUrl(), false));
 
