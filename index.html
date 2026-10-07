@@ -61,6 +61,12 @@ h1 .role{font-size:13px;padding:5px 11px;margin-left:10px;letter-spacing:.08em;p
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{background:#0b1019;border:1px solid var(--line);color:var(--muted);border-radius:99px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
 .chip.active{color:var(--text);border-color:var(--accent2);background:#0f1a1f}
+.spots{gap:8px}.spots .p{padding:10px 13px}.spot-free{color:#4f5b70;font-weight:600}
+.spots .p:nth-child(n+4) .medal{color:#78849a}
+th.cur-col,td.cur-col{background:#0f1a1f}
+.plink{cursor:pointer;font-weight:700}.plink:hover{color:var(--accent2)}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--line)}
+.stat-grid>div{background:var(--panel);padding:16px 20px}.stat-grid .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}.stat-grid .v{font-size:20px;font-weight:800;margin-top:6px}
 .notice{margin:0 0 18px;padding:12px 16px;border-radius:12px;border:1px dashed #3a4660;color:var(--muted);font-size:12px;line-height:1.5}
 
 /* --- Vista de jugador --- */
@@ -126,8 +132,8 @@ h1 .role{font-size:13px;padding:5px 11px;margin-left:10px;letter-spacing:.08em;p
   </a>
   <a class="section-card" href="?view=mge" data-nav="mge" style="--c:var(--gold)">
     <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg></div>
-    <h2>MGE ranking</h2>
-    <p>Current list of members in the MGE ranking, ordered by their MGE points.</p>
+    <h2>MGE</h2>
+    <p>Who holds each spot in the current MGE, everyone's points balance and the MGE history of this KvK.</p>
     <div class="teaser"><span><strong id="teaserMge">—</strong></span><span class="go">Open →</span></div>
   </a>
 </section>
@@ -174,9 +180,9 @@ h1 .role{font-size:13px;padding:5px 11px;margin-left:10px;letter-spacing:.08em;p
       <button class="chip" data-role="rally">Rally</button>
       <button class="chip" data-role="garrison">Garrison</button>
     </div>
-    <select id="psSort"><option value="power">Power</option><option value="kills">T4 + T5 kills</option><option value="kp">Killpoints</option><option value="deads">Deads</option><option value="name">Name</option></select>
+    <select id="psSort"><option value="power">Power</option><option value="kills">T4 + T5 kills</option><option value="kp">Killpoints</option><option value="deads">Deads</option><option value="acclaim">Acclaim</option><option value="name">Name</option></select>
   </div>
-  <div class="table-wrap"><table><thead><tr><th class="left">#</th><th class="left">Player</th><th class="left">Role</th><th id="psPowerTh">Power</th><th>KP</th><th>T4</th><th>T5</th><th>Kills</th><th>Deads</th></tr></thead><tbody id="psBody"></tbody></table></div>
+  <div class="table-wrap"><table><thead><tr><th class="left">#</th><th class="left">Player</th><th class="left">Role</th><th id="psPowerTh">Power</th><th>KP</th><th>T4</th><th>T5</th><th>Kills</th><th>Deads</th><th>Acclaim</th><th>KP req.</th><th>Deads req.</th></tr></thead><tbody id="psBody"></tbody></table></div>
 </div>
 </div>
 </div>
@@ -184,15 +190,16 @@ h1 .role{font-size:13px;padding:5px 11px;margin-left:10px;letter-spacing:.08em;p
 <!-- ===== Vista: Ranking MGE ===== -->
 <div id="view-mge" class="view">
 <div class="container">
-<div class="header"><div><div class="eyebrow">INVICTUS • MGE</div><h1>MGE ranking</h1><div class="subtitle">Members currently in the MGE ranking, ordered by MGE points.</div></div><div class="badge" id="mgeBadge">—</div></div>
+<div class="header"><div><div class="eyebrow">INVICTUS • MGE</div><h1>MGE</h1><div class="subtitle">Spots in the final top are bought with points earned during the KvK.</div></div><div class="badge" id="mgeBadge">—</div></div>
 <div id="mgeNotice"></div>
 <section class="layout">
-<div class="panel"><div class="panel-head"><h2>Top 3</h2><span class="small">MGE points</span></div><div class="podium" id="mgePodium"><div class="loading-row"><div class="spinner"></div><div class="loading-text">Loading…</div></div></div></div>
-<div class="panel"><div class="panel-head"><h2>Ranking</h2><span class="small" id="mgeCount">—</span></div>
-<div class="controls"><input id="mgeSearch" placeholder="Search player or ID…"></div>
-<div class="table-wrap"><table><thead><tr><th class="left">Pos.</th><th class="left">Player</th><th class="left">Role</th><th>Contribution</th><th>MGE points</th></tr></thead><tbody id="mgeBody"></tbody></table></div>
+<div class="panel"><div class="panel-head"><h2 id="mgeCurrentTitle">Current MGE</h2><span class="small" id="mgeCurrentMeta">—</span></div><div id="mgeCurrent"><div class="state"><div class="spinner"></div>Loading…</div></div></div>
+<div class="panel"><div class="panel-head"><h2>Points balance</h2><span class="small" id="mgeCount">—</span></div>
+<div class="controls"><input id="mgeSearch" placeholder="Search player or ID…"><select id="mgeSort"><option value="balance">Balance</option><option value="earned">Earned</option><option value="spent">Spent</option><option value="name">Name</option></select></div>
+<div class="table-wrap"><table><thead><tr><th class="left">#</th><th class="left">Player</th><th>Earned</th><th>Spent</th><th>Balance</th></tr></thead><tbody id="mgeBody"></tbody></table></div>
 </div></section>
-<div class="footer">MGE points = total contribution (own account + linked farms) / 1,000,000, rounded up.</div>
+<div class="panel"><div class="panel-head"><h2>MGE history</h2><span class="small">This KvK</span></div><div id="mgeHistory"><div class="state">Loading…</div></div></div>
+<div class="footer">Points = total KvK contribution (own account + linked farms) / 1,000,000. Points reset every KvK.</div>
 </div>
 </div>
 
@@ -226,20 +233,22 @@ const DEFAULT_PHASES = [
     { key: 'Pass 9', label: 'Pass 9' }
 ];
 
+// Apps Script del Sheet "MGE & Players" (apps-script/mge-players.gs). Vacío = aún no desplegado:
+// la web usa entonces los datos del DashBoard del KvK como respaldo.
+const DATA_API_URL = 'https://script.google.com/macros/s/AKfycbyBpepGa2akbniSbl_6RQXf341UYgncRDps81g17W4AOq4zPWcXDdS62YllVr_KcnTB-w/exec';
+
 /*
- * Contrato con el Apps Script:
- *  - GET API_URL                -> { data: [filas del DashBoard] }  (KvK)
- *  - GET API_URL?id=<id>        -> detalle del jugador (fases, mgePoints, role opcional)
- *  - GET API_URL?view=players   -> { view: 'players', data: [{ ID, Name, Power, Role, Killpoints, Deads, T4 Kills, T5 Kills, T4+T5 Kills }] }
- *  - GET API_URL?view=mge       -> { view: 'mge', data: [{ ID, Name, Points, Contribution, Role? }] }
- * Si el script todavía no soporta `view`, devuelve el DashBoard sin el campo `view`
- * y la web usa esos datos como respaldo.
+ * APIs:
+ *  - API_URL                    -> { data: [filas del DashBoard] }  (KvK)
+ *  - API_URL?id=<id>            -> detalle KvK del jugador (fases, mgePoints, mgeFarmOf)
+ *  - DATA_API_URL?view=players  -> { view: 'players', data: [filas de la pestaña Players] }
+ *  - DATA_API_URL?view=mge      -> { view: 'mge', costs, balances, events, unmatched }
  */
 
 let players = [];                 // filas del DashBoard (KvK)
-let statPlayers = null;           // filas de ?view=players (o respaldo)
+let statPlayers = null;           // filas de la pestaña Players (o respaldo)
 let statsFromDashboard = false;
-let mgeRows = null;               // filas de ?view=mge (o respaldo)
+let mgeData = null;               // { costs, balances, events, unmatched }
 let mgeEstimated = false;
 const playerCache = new Map();    // evita volver a pedir el detalle si ya se visitó
 let currentView = null;
@@ -247,15 +256,18 @@ let currentView = null;
 const fmt = n => { n = Number(n || 0); const a = Math.abs(n); if (a >= 1e9) return (n / 1e9).toFixed(2) + 'B'; if (a >= 1e6) return (n / 1e6).toFixed(2) + 'M'; if (a >= 1e3) return (n / 1e3).toFixed(1) + 'K'; return Math.round(n).toLocaleString() };
 const esc = s => String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 const sum = (arr, key) => arr.reduce((s, p) => s + (Number(p[key]) || 0), 0);
+const optFmt = n => (n === null || n === undefined) ? '—' : fmt(n);
 const loadingRow = (cols, text = 'Loading data…') => `<tr class="loading-row"><td colspan="${cols}"><div class="spinner"></div><div class="loading-text">${text}</div></td></tr>`;
 const errorRow = (cols, err) => `<tr><td colspan="${cols}" style="text-align:center;color:var(--red)">Error loading data: ${esc(err.message)}</td></tr>`;
 
 /* ---------------- Carga y mapeo de datos ---------------- */
 
-async function fetchJson(query = '') {
-    const response = await fetch(API_URL + query);
+async function fetchJson(query = '', base = API_URL) {
+    const response = await fetch(base + query);
     if (!response.ok) throw new Error('HTTP ' + response.status + ' al llamar al Apps Script');
-    return response.json();
+    const json = await response.json();
+    if (json.error) throw new Error(json.error);
+    return json;
 }
 
 function normalizeRow(row) {
@@ -284,8 +296,13 @@ function roleBadges(roles) {
     return (roles || []).map(r => `<span class="role ${r}">${r === 'rally' ? 'Rally' : 'Garrison'}</span>`).join(' ');
 }
 
+// Número o null (celdas vacías o "-" no cuentan como 0).
+const numOrNull = v => { if (v === '' || v === null || v === undefined) return null; const n = Number(v); return isFinite(n) ? n : null; };
+
 function mapPlayer(raw, index) {
     const row = normalizeRow(raw);
+    const t4 = Number(pick(row, ['t4 kills', 't4'], 0));
+    const t5 = Number(pick(row, ['t5 kills', 't5'], 0));
     return {
         rank: Number(pick(row, ['ranking', 'rank', 'rango', '#'], index + 1)),
         id: String(pick(row, ['id', 'player id', 'governor id'], '')),
@@ -293,22 +310,13 @@ function mapPlayer(raw, index) {
         power: Number(pick(row, ['power', 'power delta', 'power Δ', 'poder'], 0)),
         kp: Number(pick(row, ['killpoints', 'kp', 'killpoint'], 0)),
         deads: Number(pick(row, ['deads', 'dead', 'muertos'], 0)),
-        t4: Number(pick(row, ['t4 kills', 't4'], 0)),
-        t5: Number(pick(row, ['t5 kills', 't5'], 0)),
-        kills: Number(pick(row, ['t4+t5 kills', 't4 + t5 kills', 'kills', 't4 + t5', 't4+t5'], 0)),
+        t4, t5,
+        kills: Number(pick(row, ['t4+t5 kills', 't4 + t5 kills', 'kills', 't4 + t5', 't4+t5'], t4 + t5)),
         contribution: Number(pick(row, ['contribution', 'contribucion', 'contribución'], 0)),
-        roles: parseRoles(pick(row, ROLE_ALIASES, ''))
-    };
-}
-
-function mapMgeRow(raw, index) {
-    const row = normalizeRow(raw);
-    return {
-        pos: Number(pick(row, ['position', 'pos', 'rank', 'ranking', 'posición', 'posicion'], index + 1)),
-        id: String(pick(row, ['id', 'player id', 'governor id'], '')),
-        name: String(pick(row, ['name', 'player', 'nombre'], 'Unknown')),
-        points: Number(pick(row, ['points', 'mge points', 'mgepoints', 'puntos'], 0)),
-        contribution: Number(pick(row, ['contribution', 'contribucion', 'contribución'], 0)),
+        acclaim: numOrNull(pick(row, ['aclaim', 'acclaim'], null)),
+        highestAcclaim: numOrNull(pick(row, ['highest aclaim', 'highest acclaim'], null)),
+        kpReq: numOrNull(pick(row, ['kp requirements', 'kp requirement', 'kp req'], null)),
+        deathReq: numOrNull(pick(row, ['death requirements', 'death requirement', 'deads requirement', 'death req'], null)),
         roles: parseRoles(pick(row, ROLE_ALIASES, ''))
     };
 }
@@ -325,17 +333,18 @@ function ensureDashboard() {
 let statsPromise = null;
 function ensureStats() {
     if (!statsPromise) {
-        statsPromise = fetchJson('?view=players').then(async json => {
-            if (json.view === 'players') {
+        statsPromise = (async () => {
+            if (DATA_API_URL) {
+                const json = await fetchJson('?view=players', DATA_API_URL);
                 statPlayers = (json.data || []).map(mapPlayer);
                 statsFromDashboard = false;
             } else {
-                // El script aún no soporta ?view=players: usamos el DashBoard del KvK.
+                // Sin API de jugadores: usamos el DashBoard del KvK.
                 statPlayers = await ensureDashboard();
                 statsFromDashboard = true;
             }
             return statPlayers;
-        });
+        })();
         statsPromise.catch(() => { statsPromise = null; });
     }
     return statsPromise;
@@ -344,29 +353,43 @@ function ensureStats() {
 let mgePromise = null;
 function ensureMge() {
     if (!mgePromise) {
-        mgePromise = fetchJson('?view=mge').then(async json => {
-            if (json.view === 'mge') {
-                mgeRows = (json.data || []).map(mapMgeRow);
+        mgePromise = (async () => {
+            if (DATA_API_URL) {
+                const json = await fetchJson('?view=mge', DATA_API_URL);
+                mgeData = {
+                    costs: json.costs || [],
+                    balances: (json.balances || []).map(b => ({ ...b, id: String(b.id) })),
+                    events: json.events || [],
+                    unmatched: json.unmatched || []
+                };
                 mgeEstimated = false;
             } else {
-                // Respaldo: estimación a partir de la contribución del DashBoard (sin agrupar farms).
+                // Respaldo: puntos estimados con la contribución del DashBoard (sin farms ni gastos).
                 const base = await ensureDashboard();
-                mgeRows = base.filter(p => p.contribution > 0)
-                    .map(p => ({ id: p.id, name: p.name, contribution: p.contribution, points: Math.ceil(p.contribution / 1e6), roles: p.roles }));
+                mgeData = {
+                    costs: [], events: [], unmatched: [],
+                    balances: base.filter(p => p.contribution > 0).map(p => {
+                        const pts = Math.ceil(p.contribution / 1e6);
+                        return { id: p.id, name: p.name, earned: pts, spent: 0, balance: pts };
+                    })
+                };
                 mgeEstimated = true;
             }
-            mgeRows.sort((a, b) => b.points - a.points);
-            mgeRows.forEach((r, i) => { r.pos = i + 1; });
-            return mgeRows;
-        });
+            return mgeData;
+        })();
         mgePromise.catch(() => { mgePromise = null; });
     }
     return mgePromise;
 }
 
+// Eventos MGE: el actual de cada tipo y la etiqueta legible de cada uno.
+const currentEvents = () => (mgeData ? mgeData.events.filter(e => e.current) : []);
+const blockLabel = name => String(name || 'MGE').replace(/^mge\s*/i, '').trim() || 'MGE';
+const eventLabel = e => `${blockLabel(e.block)} #${e.number}` + (e.label ? ` · ${e.label}` : '');
+
 // Busca el rol de un jugador en cualquier lista ya cargada.
 function knownRoles(id) {
-    for (const list of [statPlayers, players, mgeRows]) {
+    for (const list of [statPlayers, players]) {
         const hit = (list || []).find(p => p.id === String(id));
         if (hit && hit.roles && hit.roles.length) return hit.roles;
     }
@@ -380,9 +403,12 @@ async function renderHome() {
         document.getElementById('teaserKvk').textContent = fmt(sum(players, 'kp'));
         document.getElementById('teaserPlayers').textContent = players.length;
     }).catch(console.error);
-    ensureMge().then(rows => {
-        const top = rows[0];
-        document.getElementById('teaserMge').innerHTML = top ? `#1 ${esc(top.name)} <span style="font-weight:400;color:var(--muted);font-size:12px">· ${top.points} pts</span>` : '—';
+    ensureMge().then(() => {
+        const cur = currentEvents()[0];
+        const total = mgeData.costs.length || 15;
+        document.getElementById('teaserMge').innerHTML = cur
+            ? `${esc(blockLabel(cur.block))} <span style="font-weight:400;color:var(--muted);font-size:12px">· ${cur.assignments.length}/${total} spots taken</span>`
+            : `${mgeData.balances.length} <span style="font-weight:400;color:var(--muted);font-size:12px">players with points</span>`;
     }).catch(console.error);
 }
 
@@ -443,8 +469,8 @@ function renderStatsTable() {
     let arr = statPlayers.filter(p => (p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)) && (psRole === 'all' || p.roles.includes(psRole)));
     arr.sort((a, b) => key === 'name' ? a.name.localeCompare(b.name) : (Number(b[key]) || 0) - (Number(a[key]) || 0));
     document.getElementById('psCount').textContent = arr.length + ' members';
-    document.getElementById('psBody').innerHTML = arr.length ? arr.map((p, i) => `<tr class="clickable"><td class="rank">${i + 1}</td><td class="name">${esc(p.name)}</td><td class="left">${p.roles.length ? roleBadges(p.roles) : '<span class="role-none">—</span>'}</td><td class="${statsFromDashboard ? (p.power < 0 ? 'negative' : 'positive') : ''}">${fmt(p.power)}</td><td>${fmt(p.kp)}</td><td>${fmt(p.t4)}</td><td>${fmt(p.t5)}</td><td>${fmt(p.kills)}</td><td>${fmt(p.deads)}</td></tr>`).join('')
-        : `<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:30px">No members match this filter.</td></tr>`;
+    document.getElementById('psBody').innerHTML = arr.length ? arr.map((p, i) => `<tr class="clickable"><td class="rank">${i + 1}</td><td class="name">${esc(p.name)}</td><td class="left">${p.roles.length ? roleBadges(p.roles) : '<span class="role-none">—</span>'}</td><td class="${statsFromDashboard ? (p.power < 0 ? 'negative' : 'positive') : ''}">${fmt(p.power)}</td><td>${fmt(p.kp)}</td><td>${fmt(p.t4)}</td><td>${fmt(p.t5)}</td><td>${fmt(p.kills)}</td><td>${fmt(p.deads)}</td><td>${optFmt(p.acclaim)}</td><td>${optFmt(p.kpReq)}</td><td>${optFmt(p.deathReq)}</td></tr>`).join('')
+        : `<tr><td colspan="12" style="text-align:center;color:var(--muted);padding:30px">No members match this filter.</td></tr>`;
     document.querySelectorAll('#psBody tr.clickable').forEach((el, i) => {
         el.addEventListener('click', () => goToPlayer(arr[i].id, arr[i].name));
     });
@@ -453,7 +479,7 @@ function renderStatsTable() {
 let statsRendered = false;
 async function renderStats() {
     if (statsRendered) return;
-    document.getElementById('psBody').innerHTML = loadingRow(9);
+    document.getElementById('psBody').innerHTML = loadingRow(12);
     try {
         await ensureStats();
         const rally = statPlayers.filter(p => p.roles.includes('rally')).length;
@@ -476,7 +502,7 @@ async function renderStats() {
         statsRendered = true;
     } catch (err) {
         console.error(err);
-        document.getElementById('psBody').innerHTML = errorRow(9, err);
+        document.getElementById('psBody').innerHTML = errorRow(12, err);
     }
 }
 
@@ -488,27 +514,66 @@ document.querySelectorAll('#psRoleChips .chip').forEach(chip => chip.addEventLis
     if (statPlayers) renderStatsTable();
 }));
 
-/* ---------------- Vista: Ranking MGE ---------------- */
+/* ---------------- Vista: MGE ---------------- */
 
-function renderMgePodium() {
-    const top = mgeRows.slice(0, 3);
-    const maxP = Math.max(top[0] ? top[0].points : 1, 1);
-    document.getElementById('mgePodium').innerHTML = top.length ? top.map((p, i) => `
-<div class="p clickable"><div class="medal">${i + 1}</div><div style="min-width:0;flex:1"><div class="pname">${esc(p.name)} ${roleBadges(p.roles)}</div><div class="pmeta">${fmt(p.contribution)} contribution</div><div class="bar"><i style="width:${Math.max(4, p.points / maxP * 100)}%"></i></div></div><div class="pvalue">${p.points}</div></div>`).join('')
-        : '<div class="state" style="padding:30px">Nobody in the ranking yet.</div>';
-    document.querySelectorAll('#mgePodium .p').forEach((el, i) => {
-        el.addEventListener('click', () => goToPlayer(top[i].id, top[i].name));
-    });
+// Lista de puestos del MGE actual: TOP, cabezas, coste y jugador (o libre).
+function renderMgeCurrent() {
+    const cur = currentEvents()[0];
+    const box = document.getElementById('mgeCurrent');
+    if (!cur) {
+        document.getElementById('mgeCurrentMeta').textContent = '—';
+        box.innerHTML = `<div class="state" style="padding:40px 20px">${mgeEstimated ? 'Connect the MGE sheet to see the assignments.' : 'No spots assigned yet.'}</div>`;
+        return;
+    }
+    document.getElementById('mgeCurrentTitle').textContent = 'Current MGE · ' + blockLabel(cur.block);
+    const bySpot = new Map(cur.assignments.map(a => [a.spot, a]));
+    const spots = mgeData.costs.length ? mgeData.costs : cur.assignments.map(a => ({ spot: a.spot, heads: a.heads, cost: a.cost }));
+    document.getElementById('mgeCurrentMeta').textContent = `${eventLabel(cur)} · ${cur.assignments.length}/${spots.length} taken`;
+    box.innerHTML = `<div class="podium spots">${spots.map(s => {
+        const a = bySpot.get(s.spot);
+        return `<div class="p ${a && a.id ? 'clickable' : ''}" data-id="${a && a.id ? esc(a.id) : ''}" data-name="${a ? esc(a.name) : ''}">
+  <div class="medal">${s.spot}</div>
+  <div style="min-width:0;flex:1"><div class="pname ${a ? '' : 'spot-free'}">${a ? esc(a.name) : 'Free'}</div><div class="pmeta">${s.heads ?? '—'} heads</div></div>
+  <div class="pvalue">${s.cost ?? '—'}<div class="pmeta" style="font-weight:400">pts</div></div>
+</div>`;
+    }).join('')}</div>`;
+    box.querySelectorAll('.p.clickable').forEach(el => el.addEventListener('click', () => goToPlayer(el.dataset.id, el.dataset.name)));
 }
 
 function renderMgeTable() {
     const q = document.getElementById('mgeSearch').value.toLowerCase().trim();
-    const arr = mgeRows.filter(p => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q));
-    document.getElementById('mgeCount').textContent = arr.length + ' members';
-    document.getElementById('mgeBody').innerHTML = arr.map(p => `<tr class="clickable"><td class="rank">#${p.pos}</td><td class="name">${esc(p.name)}</td><td class="left">${p.roles.length ? roleBadges(p.roles) : '<span class="role-none">—</span>'}</td><td>${p.contribution ? fmt(p.contribution) : '—'}</td><td class="positive" style="font-weight:800">${p.points}</td></tr>`).join('');
+    const key = document.getElementById('mgeSort').value;
+    const arr = mgeData.balances.filter(p => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q));
+    arr.sort((a, b) => key === 'name' ? a.name.localeCompare(b.name) : (Number(b[key]) || 0) - (Number(a[key]) || 0));
+    const maxE = Math.max(...mgeData.balances.map(b => Number(b.earned) || 0), 1);
+    document.getElementById('mgeCount').textContent = arr.length + ' players';
+    document.getElementById('mgeBody').innerHTML = arr.map((p, i) => `<tr class="clickable"><td class="rank">${i + 1}</td><td class="name">${esc(p.name)}</td><td>${p.earned ?? '—'}</td><td class="${p.spent ? 'negative' : ''}">${p.spent ? '−' + p.spent : '0'}</td><td><div style="font-weight:800" class="positive">${p.balance ?? '—'}</div><div class="bar" style="margin-top:4px;min-width:80px"><i style="width:${Math.max(0, (Number(p.balance) || 0) / maxE * 100)}%"></i></div></td></tr>`).join('');
     document.querySelectorAll('#mgeBody tr').forEach((el, i) => {
         el.addEventListener('click', () => goToPlayer(arr[i].id, arr[i].name));
     });
+}
+
+// Historial: una tabla por tipo de MGE, igual que la cuadrícula del Sheet (TOP x MGE).
+function renderMgeHistory() {
+    const box = document.getElementById('mgeHistory');
+    const events = mgeData.events;
+    if (!events.length) {
+        box.innerHTML = `<div class="state" style="padding:40px 20px">${mgeEstimated ? 'Connect the MGE sheet to see the history.' : 'No MGEs recorded in this KvK yet.'}</div>`;
+        return;
+    }
+    const blocks = [...new Set(events.map(e => e.block))];
+    box.innerHTML = blocks.map(block => {
+        const evs = events.filter(e => e.block === block);
+        const spots = mgeData.costs.length ? mgeData.costs.map(c => c.spot) : [...new Set(evs.flatMap(e => e.assignments.map(a => a.spot)))].sort((a, b) => a - b);
+        const head = evs.map(e => `<th class="left ${e.current ? 'cur-col' : ''}">#${e.number}${e.label ? ` · ${esc(e.label)}` : ''}${e.current ? ' <span class="small">(current)</span>' : ''}</th>`).join('');
+        const rows = spots.map(spot => `<tr><td class="rank">TOP ${spot}</td>${evs.map(e => {
+            const a = e.assignments.find(x => x.spot === spot);
+            return `<td class="left ${e.current ? 'cur-col' : ''}">${a ? `<span class="${a.id ? 'plink' : ''}" data-id="${a.id ? esc(a.id) : ''}" data-name="${esc(a.name)}">${esc(a.name)}</span>` : '<span class="role-none">—</span>'}</td>`;
+        }).join('')}</tr>`).join('');
+        return `${blocks.length > 1 ? `<div class="small" style="padding:14px 20px 0;font-weight:800;letter-spacing:.08em">${esc(block)}</div>` : ''}
+<div class="table-wrap" style="max-height:none"><table><thead><tr><th class="left">Spot</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join('');
+    box.querySelectorAll('.plink').forEach(el => el.addEventListener('click', () => goToPlayer(el.dataset.id, el.dataset.name)));
 }
 
 let mgeRendered = false;
@@ -517,20 +582,26 @@ async function renderMge() {
     document.getElementById('mgeBody').innerHTML = loadingRow(5);
     try {
         await ensureMge();
-        document.getElementById('mgeBadge').textContent = mgeRows.length + ' in ranking';
-        document.getElementById('mgeNotice').innerHTML = mgeEstimated
-            ? '<div class="notice">Estimated ranking: points are calculated from each account\'s own KvK contribution. Farm accounts are not merged into their main account yet — the exact numbers are in each player\'s profile.</div>'
-            : '';
-        renderMgePodium();
+        const cur = currentEvents()[0];
+        document.getElementById('mgeBadge').textContent = cur ? eventLabel(cur) : mgeData.balances.length + ' players';
+        const notes = [];
+        if (mgeEstimated) notes.push('MGE sheet not connected yet: balances are estimated from each account\'s own KvK contribution (no farms, no spent points).');
+        if (mgeData.unmatched.length) notes.push('<b>Names not found in MGE_Saldos</b> (their spots are not being charged): ' + mgeData.unmatched.map(esc).join(', '));
+        document.getElementById('mgeNotice').innerHTML = notes.length ? `<div class="notice">${notes.join('<br>')}</div>` : '';
+        renderMgeCurrent();
         renderMgeTable();
+        renderMgeHistory();
         mgeRendered = true;
     } catch (err) {
         console.error(err);
         document.getElementById('mgeBody').innerHTML = errorRow(5, err);
+        document.getElementById('mgeCurrent').innerHTML = '';
+        document.getElementById('mgeHistory').innerHTML = '';
     }
 }
 
-document.getElementById('mgeSearch').addEventListener('input', () => mgeRows && renderMgeTable());
+document.getElementById('mgeSearch').addEventListener('input', () => mgeData && renderMgeTable());
+document.getElementById('mgeSort').addEventListener('change', () => mgeData && renderMgeTable());
 
 /* ---------------- Vista de detalle de jugador ---------------- */
 
@@ -586,6 +657,58 @@ function formatDateRange(dates) {
     return dates.start || dates.end;
 }
 
+// Stats de la pestaña Players (poder actual, acclaim, requisitos). Vacío si no hay API de jugadores.
+function playerStatsPanel(id, kvkKp, kvkDeads) {
+    const p = !statsFromDashboard && statPlayers ? statPlayers.find(x => x.id === String(id)) : null;
+    if (!p) return '';
+    const req = (done, target) => {
+        if (!target) return optFmt(target);
+        const pct = Math.round(done / target * 100);
+        return `${fmt(target)} <span class="small" style="font-weight:600;color:${pct >= 100 ? '#5ee3c5' : 'var(--muted)'}">· ${pct}% done</span>`;
+    };
+    return `
+<div class="panel">
+  <div class="panel-head"><h2>Player stats</h2><div class="small">Players tab</div></div>
+  <div class="stat-grid">
+    <div><div class="label">Power</div><div class="v">${fmt(p.power)}</div></div>
+    <div><div class="label">Acclaim</div><div class="v">${optFmt(p.acclaim)}</div></div>
+    <div><div class="label">Highest acclaim</div><div class="v">${optFmt(p.highestAcclaim)}</div></div>
+    <div><div class="label">KP requirement</div><div class="v">${req(kvkKp, p.kpReq)}</div></div>
+    <div><div class="label">Deads requirement</div><div class="v">${req(kvkDeads, p.deathReq)}</div></div>
+  </div>
+</div>`;
+}
+
+// Saldo MGE y puestos conseguidos en este KvK. Sin hoja MGE conectada, muestra los puntos del KvK como antes.
+function playerMgePanel(id, name, payload, mge) {
+    const bal = mgeData && !mgeEstimated ? mgeData.balances.find(b => b.id === String(id)) : null;
+    if (!bal || payload.mgeFarmOf) {
+        return `
+<div class="panel">
+  <div class="panel-head"><h2>MGE points</h2><div class="small">This KvK</div></div>
+  <div style="padding:22px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+    <div style="font-size:36px;font-weight:800;color:var(--accent2)">${mge.text}</div>
+    <div class="small" style="max-width:380px">${esc(mge.note)}</div>
+  </div>
+</div>`;
+    }
+    const won = mgeData.events.flatMap(e => e.assignments
+        .filter(a => a.id === String(id) || a.name === bal.name)
+        .map(a => ({ ...a, event: e })));
+    return `
+<div class="panel">
+  <div class="panel-head"><h2>MGE</h2><div class="small">Points reset every KvK</div></div>
+  <div class="stat-grid">
+    <div><div class="label">Earned</div><div class="v">${bal.earned ?? '—'}</div></div>
+    <div><div class="label">Spent</div><div class="v ${bal.spent ? 'negative' : ''}">${bal.spent ? '−' + bal.spent : 0}</div></div>
+    <div><div class="label">Balance</div><div class="v positive">${bal.balance ?? '—'}</div></div>
+  </div>
+  ${won.length ? `<div class="table-wrap" style="max-height:none"><table><thead><tr><th class="left">MGE</th><th class="left">Spot</th><th>Heads</th><th>Cost</th></tr></thead>
+  <tbody>${won.map(a => `<tr><td>${esc(eventLabel(a.event))}${a.event.current ? ' <span class="small">(current)</span>' : ''}</td><td class="left">TOP ${a.spot}</td><td>${a.heads ?? '—'}</td><td>${a.cost ?? '—'}</td></tr>`).join('')}</tbody></table></div>`
+        : '<div class="small" style="padding:16px 20px">No MGE spots taken in this KvK yet.</div>'}
+</div>`;
+}
+
 function renderPlayer(payload, fallbackName) {
     const phaseConfig = (payload.phaseConfig && payload.phaseConfig.length) ? payload.phaseConfig : DEFAULT_PHASES;
     const phases = phaseConfig.map(cfg => classifyPhase(payload.phases, cfg));
@@ -629,13 +752,8 @@ function renderPlayer(payload, fallbackName) {
   <div class="card"><div class="label">Deads</div><div class="value">${fmt(totalDeads)}</div></div>
   <div class="card"><div class="label">Best phase</div><div class="value" style="font-size:20px">${esc(bestPhase.label)}</div></div>
 </section>
-<div class="panel">
-  <div class="panel-head"><h2>MGE points</h2><div class="small">Contribution vs. kingdom average</div></div>
-  <div style="padding:22px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
-    <div style="font-size:36px;font-weight:800;color:var(--accent2)">${mge.text}</div>
-    <div class="small" style="max-width:380px">${esc(mge.note)}</div>
-  </div>
-</div>
+${playerStatsPanel(payload.id, totalKp, totalDeads)}
+${playerMgePanel(payload.id, name, payload, mge)}
 <div class="panel">
   <div class="panel-head"><h2>Phase timeline</h2><div class="small">KvK chronological order</div></div>
   <div class="timeline"><div class="tl-track"></div><div class="tl-steps">${stepsHtml}</div></div>
@@ -664,12 +782,15 @@ async function showPlayerView(id, name) {
     document.getElementById('rankBadge').textContent = '—';
     document.getElementById('playerContent').innerHTML = '<div class="state"><div class="spinner"></div>Loading player data…</div>';
 
+    // Stats y MGE vienen de la otra API; si fallan, el perfil se muestra igual sin esos paneles.
+    const extras = DATA_API_URL ? Promise.all([ensureStats().catch(console.error), ensureMge().catch(console.error)]) : Promise.resolve();
     try {
         let payload = playerCache.get(id);
         if (!payload) {
             payload = await fetchJson('?id=' + encodeURIComponent(id));
             playerCache.set(id, payload);
         }
+        await extras;
         renderPlayer(payload, name);
     } catch (err) {
         console.error(err);
