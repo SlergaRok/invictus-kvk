@@ -81,30 +81,31 @@ function readMge_() {
   const idByName = {};
   balances.forEach(b => { idByName[b.name] = b.id; });
 
-  // Cuadrícula de asignaciones: bloques "MGE xxx", fila "TOPS" con cabeceras, filas 1..15
+  // Cuadrícula de asignaciones: fila con el nombre de cada MGE ("MGE LID.", "MGE CAV"...),
+  // debajo la fila "TOPS" y luego las filas 1..15. Cada columna B..J es un MGE.
   const grid = sheet_(TABS.grid).getDataRange().getValues();
   const blocks = [];
   let block = null;
+  let prev = null; // última fila no vacía antes de la actual
   grid.forEach(row => {
-    const a = clean_(row[0]);
-    // El título del bloque ("MGE LID.", "MGE CAV"...) puede estar en cualquier columna (celdas combinadas).
-    const title = row.map(clean_).find(v => v !== '') || '';
-    if (/^mge\b/i.test(title) && !num_(row[0])) {
-      block = { name: title, headers: [], cells: [] };
+    if (/^tops?$/i.test(clean_(row[0]))) {
+      block = {
+        name: 'MGE',
+        names: prev ? prev.slice(1, 1 + MEMBER_COLS).map(clean_) : [],
+        headers: row.slice(1, 1 + MEMBER_COLS).map(clean_),
+        cells: []
+      };
       blocks.push(block);
-      return;
+    } else if (block) {
+      const spot = num_(row[0]);
+      if (spot) {
+        for (let c = 1; c <= MEMBER_COLS; c++) {
+          const name = clean_(row[c]);
+          if (name) block.cells.push({ col: c, spot: spot, name: name });
+        }
+      }
     }
-    if (!block) { block = { name: 'MGE', headers: [], cells: [] }; blocks.push(block); }
-    if (/^tops?$/i.test(a)) {
-      block.headers = row.slice(1, 1 + MEMBER_COLS).map(clean_);
-      return;
-    }
-    const spot = num_(row[0]);
-    if (!spot) return;
-    for (let c = 1; c <= MEMBER_COLS; c++) {
-      const name = clean_(row[c]);
-      if (name) block.cells.push({ col: c, spot: spot, name: name });
-    }
+    if (row.some(v => clean_(v) !== '')) prev = row;
   });
 
   // Un evento por columna con al menos un nombre; el último de cada bloque es el actual
@@ -113,7 +114,7 @@ function readMge_() {
   blocks.forEach(b => {
     const cols = Array.from(new Set(b.cells.map(x => x.col))).sort((x, y) => x - y);
     cols.forEach((col, i) => {
-      const header = b.headers[col - 1] || '';
+      const header = /^miembros?$/i.test(b.headers[col - 1] || '') ? '' : (b.headers[col - 1] || '');
       const assignments = b.cells.filter(x => x.col === col)
         .sort((x, y) => x.spot - y.spot)
         .map(x => {
@@ -124,9 +125,10 @@ function readMge_() {
         });
       events.push({
         block: b.name,
+        name: b.names[col - 1] || header || ('MGE #' + (i + 1)),
         number: i + 1,
         column: col,
-        label: /^miembros?$/i.test(header) ? '' : header,
+        label: header,
         current: i === cols.length - 1,
         assignments: assignments
       });

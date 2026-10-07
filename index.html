@@ -426,8 +426,9 @@ function reqProgress(id, target, key) {
 
 // Eventos MGE: el actual de cada tipo y la etiqueta legible de cada uno.
 const currentEvents = () => (mgeData ? mgeData.events.filter(e => e.current) : []);
-const blockLabel = name => String(name || 'MGE').trim() || 'MGE';
-const eventLabel = e => `${blockLabel(e.block)} #${e.number}` + (e.label ? ` · ${e.label}` : '');
+// Nombre del MGE tal cual está en la fila de encima de "TOPS" en el Sheet (p. ej. "MGE LID.").
+const eventName = e => e.name || e.label || 'MGE';
+const eventLabel = e => `${eventName(e)} (#${e.number})`;
 
 // Busca el rol de un jugador en cualquier lista ya cargada.
 function knownRoles(id) {
@@ -449,7 +450,7 @@ async function renderHome() {
         const cur = currentEvents()[0];
         const total = mgeData.costs.length || 15;
         document.getElementById('teaserMge').innerHTML = cur
-            ? `${esc(blockLabel(cur.block))} <span style="font-weight:400;color:var(--muted);font-size:12px">· ${cur.assignments.length}/${total} spots taken</span>`
+            ? `${esc(eventName(cur))} <span style="font-weight:400;color:var(--muted);font-size:12px">· ${cur.assignments.length}/${total} spots taken</span>`
             : `${mgeData.balances.length} <span style="font-weight:400;color:var(--muted);font-size:12px">players with points</span>`;
     }).catch(console.error);
 }
@@ -568,10 +569,10 @@ function renderMgeCurrent() {
         box.innerHTML = `<div class="state" style="padding:40px 20px">${mgeEstimated ? 'Connect the MGE sheet to see the assignments.' : 'No spots assigned yet.'}</div>`;
         return;
     }
-    document.getElementById('mgeCurrentTitle').textContent = 'Current · ' + blockLabel(cur.block);
+    document.getElementById('mgeCurrentTitle').textContent = 'Current · ' + eventName(cur);
     const bySpot = new Map(cur.assignments.map(a => [a.spot, a]));
     const spots = mgeData.costs.length ? mgeData.costs : cur.assignments.map(a => ({ spot: a.spot, heads: a.heads, cost: a.cost }));
-    document.getElementById('mgeCurrentMeta').textContent = `${eventLabel(cur)} · ${cur.assignments.length}/${spots.length} taken`;
+    document.getElementById('mgeCurrentMeta').textContent = `#${cur.number} · ${cur.assignments.length}/${spots.length} taken`;
     box.innerHTML = `<div class="podium spots">${spots.map(s => {
         const a = bySpot.get(s.spot);
         return `<div class="p ${a && a.id ? 'clickable' : ''}" data-id="${a && a.id ? esc(a.id) : ''}" data-name="${a ? esc(a.name) : ''}">
@@ -608,12 +609,12 @@ function renderMgeHistory() {
     box.innerHTML = blocks.map(block => {
         const evs = events.filter(e => e.block === block);
         const spots = mgeData.costs.length ? mgeData.costs.map(c => c.spot) : [...new Set(evs.flatMap(e => e.assignments.map(a => a.spot)))].sort((a, b) => a - b);
-        const head = evs.map(e => `<th class="left ${e.current ? 'cur-col' : ''}">#${e.number}${e.label ? ` · ${esc(e.label)}` : ''}${e.current ? ' <span class="small">(current)</span>' : ''}</th>`).join('');
+        const head = evs.map(e => `<th class="left ${e.current ? 'cur-col' : ''}">${esc(eventLabel(e))}${e.current ? ' <span class="small">· current</span>' : ''}</th>`).join('');
         const rows = spots.map(spot => `<tr><td class="rank">TOP ${spot}</td>${evs.map(e => {
             const a = e.assignments.find(x => x.spot === spot);
             return `<td class="left ${e.current ? 'cur-col' : ''}">${a ? `<span class="${a.id ? 'plink' : ''}" data-id="${a.id ? esc(a.id) : ''}" data-name="${esc(a.name)}">${esc(a.name)}</span>` : '<span class="role-none">—</span>'}</td>`;
         }).join('')}</tr>`).join('');
-        return `<div class="panel"><div class="panel-head"><h2>${esc(blockLabel(block))}</h2><span class="small">History · this KvK</span></div>
+        return `<div class="panel"><div class="panel-head"><h2>MGE history</h2><span class="small">This KvK</span></div>
 <div class="table-wrap" style="max-height:none"><table><thead><tr><th class="left">Spot</th>${head}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
     }).join('');
     box.querySelectorAll('.plink').forEach(el => el.addEventListener('click', () => goToPlayer(el.dataset.id, el.dataset.name)));
