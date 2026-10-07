@@ -87,8 +87,10 @@ function readMge_() {
   let block = null;
   grid.forEach(row => {
     const a = clean_(row[0]);
-    if (/^mge\b/i.test(a)) {
-      block = { name: a, headers: [], cells: [] };
+    // El título del bloque ("MGE LID.", "MGE CAV"...) puede estar en cualquier columna (celdas combinadas).
+    const title = row.map(clean_).find(v => v !== '') || '';
+    if (/^mge\b/i.test(title) && !num_(row[0])) {
+      block = { name: title, headers: [], cells: [] };
       blocks.push(block);
       return;
     }

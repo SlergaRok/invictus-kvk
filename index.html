@@ -70,6 +70,11 @@ th.cur-col,td.cur-col{background:#0f1a1f}
 .cards-5{grid-template-columns:repeat(5,1fr)}.cards-5 .value{font-size:26px}
 @media(max-width:1200px){.cards-5{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:600px){.cards-5{grid-template-columns:1fr 1fr}}
+.mge-layout{align-items:stretch}.mge-layout>.panel{margin-bottom:0}
+.mge-balance{display:flex;flex-direction:column}
+.mge-balance .table-wrap{flex:1 1 0;min-height:240px;max-height:none;contain:size}
+@media(max-width:1000px){.mge-balance .table-wrap{flex:none;max-height:600px;contain:none}}
+#mgeHistory{margin-top:18px}
 .notice{margin:0 0 18px;padding:12px 16px;border-radius:12px;border:1px dashed #3a4660;color:var(--muted);font-size:12px;line-height:1.5}
 
 /* --- Vista de jugador --- */
@@ -198,13 +203,13 @@ th.cur-col,td.cur-col{background:#0f1a1f}
 <div class="container">
 <div class="header"><div><div class="eyebrow">INVICTUS • MGE</div><h1>MGE</h1><div class="subtitle">Spots in the final top are bought with points earned during the KvK.</div></div><div class="badge" id="mgeBadge">—</div></div>
 <div id="mgeNotice"></div>
-<section class="layout">
+<section class="layout mge-layout">
 <div class="panel"><div class="panel-head"><h2 id="mgeCurrentTitle">Current MGE</h2><span class="small" id="mgeCurrentMeta">—</span></div><div id="mgeCurrent"><div class="state"><div class="spinner"></div>Loading…</div></div></div>
-<div class="panel"><div class="panel-head"><h2>Points balance</h2><span class="small" id="mgeCount">—</span></div>
+<div class="panel mge-balance"><div class="panel-head"><h2>Points balance</h2><span class="small" id="mgeCount">—</span></div>
 <div class="controls"><input id="mgeSearch" placeholder="Search player or ID…"><select id="mgeSort"><option value="balance">Balance</option><option value="earned">Earned</option><option value="spent">Spent</option><option value="name">Name</option></select></div>
 <div class="table-wrap"><table><thead><tr><th class="left">#</th><th class="left">Player</th><th>Earned</th><th>Spent</th><th>Balance</th></tr></thead><tbody id="mgeBody"></tbody></table></div>
 </div></section>
-<div class="panel"><div class="panel-head"><h2>MGE history</h2><span class="small">This KvK</span></div><div id="mgeHistory"><div class="state">Loading…</div></div></div>
+<div id="mgeHistory"></div>
 <div class="footer">Points = total KvK contribution (own account + linked farms) / 1,000,000. Points reset every KvK.</div>
 </div>
 </div>
@@ -418,14 +423,10 @@ function reqProgress(id, target, key) {
     const done = Number(row[key]) || 0;
     return { done, pct: Math.round(done / target * 100) };
 }
-const reqCell = (id, target, key) => {
-    const r = reqProgress(id, target, key);
-    return optFmt(target) + (r ? ` <span class="small" style="color:${r.pct >= 100 ? '#5ee3c5' : 'var(--muted)'}">${r.pct}%</span>` : '');
-};
 
 // Eventos MGE: el actual de cada tipo y la etiqueta legible de cada uno.
 const currentEvents = () => (mgeData ? mgeData.events.filter(e => e.current) : []);
-const blockLabel = name => String(name || 'MGE').replace(/^mge\s*/i, '').trim() || 'MGE';
+const blockLabel = name => String(name || 'MGE').trim() || 'MGE';
 const eventLabel = e => `${blockLabel(e.block)} #${e.number}` + (e.label ? ` · ${e.label}` : '');
 
 // Busca el rol de un jugador en cualquier lista ya cargada.
@@ -510,7 +511,7 @@ function renderStatsTable() {
     let arr = statPlayers.filter(p => (p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)) && (psRole === 'all' || p.roles.includes(psRole)));
     arr.sort((a, b) => key === 'name' ? a.name.localeCompare(b.name) : (Number(b[key]) || 0) - (Number(a[key]) || 0));
     document.getElementById('psCount').textContent = arr.length + ' members';
-    document.getElementById('psBody').innerHTML = arr.length ? arr.map((p, i) => `<tr class="clickable"><td class="rank">${i + 1}</td><td class="name">${esc(p.name)}</td><td class="left">${p.roles.length ? roleBadges(p.roles) : '<span class="role-none">—</span>'}</td><td class="${statsFromDashboard ? (p.power < 0 ? 'negative' : 'positive') : ''}">${fmt(p.power)}</td><td>${fmt(p.kp)}</td><td>${fmt(p.t4)}</td><td>${fmt(p.t5)}</td><td>${fmt(p.kills)}</td><td>${fmt(p.deads)}</td><td>${optFmt(p.acclaim)}</td><td>${reqCell(p.id, p.kpReq, 'kp')}</td><td>${reqCell(p.id, p.deathReq, 'deads')}</td></tr>`).join('')
+    document.getElementById('psBody').innerHTML = arr.length ? arr.map((p, i) => `<tr class="clickable"><td class="rank">${i + 1}</td><td class="name">${esc(p.name)}</td><td class="left">${p.roles.length ? roleBadges(p.roles) : '<span class="role-none">—</span>'}</td><td class="${statsFromDashboard ? (p.power < 0 ? 'negative' : 'positive') : ''}">${fmt(p.power)}</td><td>${fmt(p.kp)}</td><td>${fmt(p.t4)}</td><td>${fmt(p.t5)}</td><td>${fmt(p.kills)}</td><td>${fmt(p.deads)}</td><td>${optFmt(p.acclaim)}</td><td>${optFmt(p.kpReq)}</td><td>${optFmt(p.deathReq)}</td></tr>`).join('')
         : `<tr><td colspan="12" style="text-align:center;color:var(--muted);padding:30px">No members match this filter.</td></tr>`;
     document.querySelectorAll('#psBody tr.clickable').forEach((el, i) => {
         el.addEventListener('click', () => goToPlayer(arr[i].id, arr[i].name));
@@ -522,7 +523,7 @@ async function renderStats() {
     if (statsRendered) return;
     document.getElementById('psBody').innerHTML = loadingRow(12);
     try {
-        await Promise.all([ensureStats(), ensureDashboard().catch(console.error)]); // DashBoard: % de requisitos
+        await ensureStats();
         const rally = statPlayers.filter(p => p.roles.includes('rally')).length;
         const garrison = statPlayers.filter(p => p.roles.includes('garrison')).length;
         const anyRoles = rally + garrison > 0;
@@ -558,7 +559,7 @@ document.querySelectorAll('#psRoleChips .chip').forEach(chip => chip.addEventLis
 
 /* ---------------- Vista: MGE ---------------- */
 
-// Lista de puestos del MGE actual: TOP, cabezas, coste y jugador (o libre).
+// Lista de puestos del MGE actual: TOP, jugador (o libre) y cabezas que obtiene.
 function renderMgeCurrent() {
     const cur = currentEvents()[0];
     const box = document.getElementById('mgeCurrent');
@@ -567,7 +568,7 @@ function renderMgeCurrent() {
         box.innerHTML = `<div class="state" style="padding:40px 20px">${mgeEstimated ? 'Connect the MGE sheet to see the assignments.' : 'No spots assigned yet.'}</div>`;
         return;
     }
-    document.getElementById('mgeCurrentTitle').textContent = 'Current MGE · ' + blockLabel(cur.block);
+    document.getElementById('mgeCurrentTitle').textContent = 'Current · ' + blockLabel(cur.block);
     const bySpot = new Map(cur.assignments.map(a => [a.spot, a]));
     const spots = mgeData.costs.length ? mgeData.costs : cur.assignments.map(a => ({ spot: a.spot, heads: a.heads, cost: a.cost }));
     document.getElementById('mgeCurrentMeta').textContent = `${eventLabel(cur)} · ${cur.assignments.length}/${spots.length} taken`;
@@ -575,8 +576,8 @@ function renderMgeCurrent() {
         const a = bySpot.get(s.spot);
         return `<div class="p ${a && a.id ? 'clickable' : ''}" data-id="${a && a.id ? esc(a.id) : ''}" data-name="${a ? esc(a.name) : ''}">
   <div class="medal">${s.spot}</div>
-  <div style="min-width:0;flex:1"><div class="pname ${a ? '' : 'spot-free'}">${a ? esc(a.name) : 'Free'}</div><div class="pmeta">${s.heads ?? '—'} heads</div></div>
-  <div class="pvalue">${s.cost ?? '—'}<div class="pmeta" style="font-weight:400">pts</div></div>
+  <div style="min-width:0;flex:1"><div class="pname ${a ? '' : 'spot-free'}">${a ? esc(a.name) : 'Free'}</div></div>
+  <div class="pvalue">${s.heads ?? '—'} <span class="pmeta" style="font-weight:400">heads</span></div>
 </div>`;
     }).join('')}</div>`;
     box.querySelectorAll('.p.clickable').forEach(el => el.addEventListener('click', () => goToPlayer(el.dataset.id, el.dataset.name)));
@@ -600,7 +601,7 @@ function renderMgeHistory() {
     const box = document.getElementById('mgeHistory');
     const events = mgeData.events;
     if (!events.length) {
-        box.innerHTML = `<div class="state" style="padding:40px 20px">${mgeEstimated ? 'Connect the MGE sheet to see the history.' : 'No MGEs recorded in this KvK yet.'}</div>`;
+        box.innerHTML = `<div class="panel"><div class="panel-head"><h2>MGE history</h2></div><div class="state" style="padding:40px 20px">${mgeEstimated ? 'Connect the MGE sheet to see the history.' : 'No MGEs recorded in this KvK yet.'}</div></div>`;
         return;
     }
     const blocks = [...new Set(events.map(e => e.block))];
@@ -612,8 +613,8 @@ function renderMgeHistory() {
             const a = e.assignments.find(x => x.spot === spot);
             return `<td class="left ${e.current ? 'cur-col' : ''}">${a ? `<span class="${a.id ? 'plink' : ''}" data-id="${a.id ? esc(a.id) : ''}" data-name="${esc(a.name)}">${esc(a.name)}</span>` : '<span class="role-none">—</span>'}</td>`;
         }).join('')}</tr>`).join('');
-        return `${blocks.length > 1 ? `<div class="small" style="padding:14px 20px 0;font-weight:800;letter-spacing:.08em">${esc(block)}</div>` : ''}
-<div class="table-wrap" style="max-height:none"><table><thead><tr><th class="left">Spot</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+        return `<div class="panel"><div class="panel-head"><h2>${esc(blockLabel(block))}</h2><span class="small">History · this KvK</span></div>
+<div class="table-wrap" style="max-height:none"><table><thead><tr><th class="left">Spot</th>${head}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
     }).join('');
     box.querySelectorAll('.plink').forEach(el => el.addEventListener('click', () => goToPlayer(el.dataset.id, el.dataset.name)));
 }
