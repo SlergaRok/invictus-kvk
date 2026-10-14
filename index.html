@@ -42,7 +42,8 @@ tr.clickable{cursor:pointer}
 
 /* --- Landing --- */
 .hero{padding:40px 0 30px}.hero h1{font-size:52px}.hero .subtitle{font-size:16px;max-width:620px}
-.sections{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.sections{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+@media(max-width:1250px){.sections{grid-template-columns:repeat(2,1fr)}}
 .section-card{display:flex;flex-direction:column;gap:14px;padding:26px;border-radius:22px;border:1px solid var(--line);background:linear-gradient(160deg,var(--panel2),var(--panel));color:var(--text);text-decoration:none;position:relative;overflow:hidden;transition:transform .15s,border-color .15s;min-height:250px}
 .section-card:hover{transform:translateY(-3px);border-color:var(--c,var(--accent2))}
 .section-card::after{content:"";position:absolute;right:-60px;top:-60px;width:180px;height:180px;border-radius:50%;background:var(--c,var(--accent2));opacity:.08}
@@ -75,6 +76,10 @@ th.cur-col,td.cur-col{background:#0f1a1f}
 .mge-balance .table-wrap{flex:1 1 0;min-height:240px;max-height:none;contain:size}
 @media(max-width:1000px){.mge-balance .table-wrap{flex:none;max-height:600px;contain:none}}
 #mgeHistory{margin-top:18px}
+.forts-layout{align-items:stretch}.forts-layout>.panel{margin-bottom:0}
+.forts-total{display:flex;flex-direction:column}
+.forts-total .table-wrap{flex:1 1 0;min-height:240px;max-height:none;contain:size}
+@media(max-width:1000px){.forts-total .table-wrap{flex:none;max-height:600px;contain:none}}
 .notice{margin:0 0 18px;padding:12px 16px;border-radius:12px;border:1px dashed #3a4660;color:var(--muted);font-size:12px;line-height:1.5}
 
 /* --- Vista de jugador --- */
@@ -116,6 +121,7 @@ th.cur-col,td.cur-col{background:#0f1a1f}
     <a href="?view=kvk" data-nav="kvk">Last KvK</a>
     <a href="?view=players" data-nav="players">Players</a>
     <a href="?view=mge" data-nav="mge">MGE</a>
+    <a href="?view=forts" data-nav="forts">Forts</a>
   </nav>
 </div></header>
 
@@ -125,7 +131,7 @@ th.cur-col,td.cur-col{background:#0f1a1f}
 <div class="hero">
   <div class="eyebrow">INVICTUS • KINGDOM HUB</div>
   <h1>What do you want to check?</h1>
-  <div class="subtitle">KvK performance, player stats and the MGE ranking — all from the alliance tracking sheet.</div>
+  <div class="subtitle">KvK performance, player stats, MGE spots and forts — all from the alliance tracking sheets.</div>
 </div>
 <section class="sections">
   <a class="section-card" href="?view=kvk" data-nav="kvk" style="--c:var(--accent2)">
@@ -145,6 +151,12 @@ th.cur-col,td.cur-col{background:#0f1a1f}
     <h2>MGE</h2>
     <p>Who holds each spot in the current MGE, everyone's points balance and the MGE history of this KvK.</p>
     <div class="teaser"><span><strong id="teaserMge">—</strong></span><span class="go">Open →</span></div>
+  </a>
+  <a class="section-card" href="?view=forts" data-nav="forts" style="--c:var(--bronze)">
+    <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V8h3v2h2V8h4v2h2V8h3v13"/><path d="M10 21v-4a2 2 0 0 1 4 0v4"/><path d="M12 8V3l4 1.5L12 6"/></svg></div>
+    <h2>Fort tracker</h2>
+    <p>Who has done the most barbarian forts in total, and the top 18 of the current week.</p>
+    <div class="teaser"><span><strong id="teaserForts">—</strong></span><span class="go">Open →</span></div>
   </a>
 </section>
 </div>
@@ -211,6 +223,20 @@ th.cur-col,td.cur-col{background:#0f1a1f}
 </div></section>
 <div id="mgeHistory"></div>
 <div class="footer">Points = total KvK contribution (own account + linked farms) / 1,000,000. Points reset every KvK.</div>
+</div>
+</div>
+
+<!-- ===== Vista: Fort tracker ===== -->
+<div id="view-forts" class="view">
+<div class="container">
+<div class="header"><div><div class="eyebrow">INVICTUS • FORT TRACKER</div><h1>Forts</h1><div class="subtitle">Barbarian forts done by every member, week by week.</div></div><div class="badge" id="fortsBadge">—</div></div>
+<section class="layout forts-layout">
+<div class="panel"><div class="panel-head"><h2 id="fortsWeekTitle">Top 18 · this week</h2><span class="small" id="fortsWeekMeta">—</span></div><div id="fortsWeek"><div class="state"><div class="spinner"></div>Loading…</div></div></div>
+<div class="panel forts-total"><div class="panel-head"><h2>Total ranking</h2><span class="small" id="fortsCount">—</span></div>
+<div class="controls"><input id="fortsSearch" placeholder="Search player or ID…"></div>
+<div class="table-wrap"><table><thead><tr id="fortsHead"><th class="left">#</th><th class="left">Player</th><th>Total</th></tr></thead><tbody id="fortsBody"></tbody></table></div>
+</div></section>
+<div class="footer">Data from the Fort Tracker tab</div>
 </div>
 </div>
 
@@ -424,6 +450,24 @@ function reqProgress(id, target, key) {
     return { done, pct: Math.round(done / target * 100) };
 }
 
+let fortsData = null;             // { weeks, currentWeek, data }
+let fortsPromise = null;
+function ensureForts() {
+    if (!fortsPromise) {
+        fortsPromise = (async () => {
+            if (!DATA_API_URL) throw new Error('The MGE & Players sheet is not connected');
+            const json = await fetchJson('?view=forts', DATA_API_URL);
+            const data = (json.data || []).map(p => ({ ...p, id: String(p.id), total: Number(p.total) || 0 }))
+                .sort((a, b) => b.total - a.total);
+            data.forEach((p, i) => { p.rank = i + 1; });
+            fortsData = { weeks: json.weeks || [], currentWeek: json.currentWeek ?? -1, data };
+            return fortsData;
+        })();
+        fortsPromise.catch(() => { fortsPromise = null; });
+    }
+    return fortsPromise;
+}
+
 // Eventos MGE: el actual de cada tipo y la etiqueta legible de cada uno.
 const currentEvents = () => (mgeData ? mgeData.events.filter(e => e.current) : []);
 // Nombre del MGE tal cual está en la fila de encima de "TOPS" en el Sheet (p. ej. "MGE LID.").
@@ -442,6 +486,11 @@ function knownRoles(id) {
 /* ---------------- Landing ---------------- */
 
 async function renderHome() {
+    ensureForts().then(() => {
+        const top = fortsData.data[0];
+        document.getElementById('teaserForts').innerHTML = top
+            ? `#1 ${esc(top.name)} <span style="font-weight:400;color:var(--muted);font-size:12px">· ${top.total} forts</span>` : '—';
+    }).catch(console.error);
     ensureDashboard().then(() => {
         document.getElementById('teaserKvk').textContent = fmt(sum(players, 'kp'));
         document.getElementById('teaserPlayers').textContent = players.length;
@@ -620,6 +669,60 @@ function renderMgeHistory() {
     box.querySelectorAll('.plink').forEach(el => el.addEventListener('click', () => goToPlayer(el.dataset.id, el.dataset.name)));
 }
 
+/* ---------------- Vista: Fort tracker ---------------- */
+
+// Top 18 de la semana en curso (la última semana con datos).
+function renderFortsWeek() {
+    const w = fortsData.currentWeek;
+    const box = document.getElementById('fortsWeek');
+    if (w < 0) {
+        document.getElementById('fortsWeekMeta').textContent = '—';
+        box.innerHTML = '<div class="state" style="padding:40px 20px">No weekly data yet.</div>';
+        return;
+    }
+    const top = fortsData.data.filter(p => p.weeks[w] > 0).sort((a, b) => b.weeks[w] - a.weeks[w]).slice(0, 18);
+    const maxW = Math.max(top[0] ? top[0].weeks[w] : 1, 1);
+    document.getElementById('fortsWeekTitle').textContent = 'Top 18 · ' + fortsData.weeks[w];
+    document.getElementById('fortsWeekMeta').textContent = 'Current week';
+    box.innerHTML = top.length ? `<div class="podium spots">${top.map((p, i) => `
+<div class="p clickable" data-id="${esc(p.id)}" data-name="${esc(p.name)}"><div class="medal">${i + 1}</div><div style="min-width:0;flex:1"><div class="pname">${esc(p.name)}</div><div class="bar"><i style="width:${Math.max(4, p.weeks[w] / maxW * 100)}%"></i></div></div><div class="pvalue">${p.weeks[w]}</div></div>`).join('')}</div>`
+        : '<div class="state" style="padding:40px 20px">Nobody has done forts this week yet.</div>';
+    box.querySelectorAll('.p.clickable').forEach(el => el.addEventListener('click', () => goToPlayer(el.dataset.id, el.dataset.name)));
+}
+
+// Ranking total con el detalle de cada semana que ya tiene datos.
+function renderFortsTable() {
+    const q = document.getElementById('fortsSearch').value.toLowerCase().trim();
+    const weeks = fortsData.weeks.slice(0, fortsData.currentWeek + 1);
+    const arr = fortsData.data.filter(p => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q));
+    document.getElementById('fortsHead').innerHTML = '<th class="left">#</th><th class="left">Player</th><th>Total</th>' + weeks.map(w => `<th>${esc(w)}</th>`).join('');
+    document.getElementById('fortsCount').textContent = arr.length + ' players';
+    document.getElementById('fortsBody').innerHTML = arr.map(p => `<tr class="clickable"><td class="rank">#${p.rank}</td><td class="name">${esc(p.name)}</td><td class="positive" style="font-weight:800">${p.total}</td>${weeks.map((_, i) => `<td>${p.weeks[i] ?? '<span class="role-none">—</span>'}</td>`).join('')}</tr>`).join('');
+    document.querySelectorAll('#fortsBody tr').forEach((el, i) => {
+        el.addEventListener('click', () => goToPlayer(arr[i].id, arr[i].name));
+    });
+}
+
+let fortsRendered = false;
+async function renderForts() {
+    if (fortsRendered) return;
+    document.getElementById('fortsBody').innerHTML = loadingRow(3);
+    try {
+        await ensureForts();
+        const w = fortsData.currentWeek;
+        document.getElementById('fortsBadge').textContent = (w >= 0 ? fortsData.weeks[w] + ' in progress · ' : '') + sum(fortsData.data, 'total') + ' forts in total';
+        renderFortsWeek();
+        renderFortsTable();
+        fortsRendered = true;
+    } catch (err) {
+        console.error(err);
+        document.getElementById('fortsBody').innerHTML = errorRow(3, err);
+        document.getElementById('fortsWeek').innerHTML = '';
+    }
+}
+
+document.getElementById('fortsSearch').addEventListener('input', () => fortsData && renderFortsTable());
+
 let mgeRendered = false;
 async function renderMge() {
     if (mgeRendered) return;
@@ -696,6 +799,22 @@ const stateBox = (html, cls = '') => `<div class="state ${cls}">${html}</div>`;
 
 /* ---------------- Vista: Perfil del jugador (datos actuales) ---------------- */
 
+// Forts del jugador (pestaña Fort Tracker). Vacío si no hay datos.
+function playerFortsPanel(id) {
+    const p = fortsData ? fortsData.data.find(x => x.id === String(id)) : null;
+    if (!p) return '';
+    const w = fortsData.currentWeek;
+    return `
+<div class="panel">
+  <div class="panel-head"><h2>Forts</h2><div class="small">Fort Tracker</div></div>
+  <div class="stat-grid">
+    <div><div class="label">Total forts</div><div class="v positive">${p.total}</div></div>
+    <div><div class="label">Ranking</div><div class="v">#${p.rank} <span class="small" style="font-weight:600">of ${fortsData.data.length}</span></div></div>
+    ${w >= 0 ? `<div><div class="label">${esc(fortsData.weeks[w])} (current)</div><div class="v">${p.weeks[w] ?? 0}</div></div>` : ''}
+  </div>
+</div>`;
+}
+
 // Saldo MGE y puestos conseguidos en este KvK. Vacío si la hoja MGE no está conectada.
 function playerMgePanel(id) {
     if (!mgeData || mgeEstimated) return '';
@@ -732,7 +851,7 @@ async function showPlayerProfile(id, name) {
     content.innerHTML = stateBox('<div class="spinner"></div>Loading player data…');
 
     try {
-        await Promise.all([ensureStats(), ensureMge().catch(console.error)]);
+        await Promise.all([ensureStats(), ensureMge().catch(console.error), DATA_API_URL ? ensureForts().catch(console.error) : null]);
         const p = statsFromDashboard ? null : statPlayers.find(x => x.id === String(id));
         if (p) {
             document.getElementById('ppName').textContent = p.name;
@@ -756,7 +875,7 @@ async function showPlayerProfile(id, name) {
     <div><div class="label">Deads requirement (next KvK)</div><div class="v">${optFmt(p.deathReq)}</div></div>
   </div>
 </div>` : `<div class="panel">${stateBox(statsFromDashboard ? 'The Players sheet is not connected yet.' : 'This player is not in the Players tab.')}</div>`;
-        content.innerHTML = statsHtml + playerMgePanel(id);
+        content.innerHTML = statsHtml + playerMgePanel(id) + playerFortsPanel(id);
     } catch (err) {
         console.error(err);
         content.innerHTML = stateBox('Error loading data: ' + esc(err.message), 'error');
@@ -872,9 +991,9 @@ async function showKvkProfile(id, name) {
 
 /* ---------------- Router (cambia de vista sin recargar, con botón atrás) ---------------- */
 
-const VIEWS = ['home', 'kvk', 'players', 'mge', 'player', 'kvkplayer'];
+const VIEWS = ['home', 'kvk', 'players', 'mge', 'forts', 'player', 'kvkplayer'];
 const PROFILE_VIEWS = { player: { param: 'player', show: showPlayerProfile }, kvkplayer: { param: 'kvk', show: showKvkProfile } };
-const RENDERERS = { home: renderHome, kvk: renderKvk, players: renderStats, mge: renderMge };
+const RENDERERS = { home: renderHome, kvk: renderKvk, players: renderStats, mge: renderMge, forts: renderForts };
 const isProfile = view => view in PROFILE_VIEWS;
 let previousView = null; // lista desde la que se abrió un perfil, para el botón "Back"
 let currentProfile = null; // { id, name } del perfil abierto, para saltar entre las dos vistas

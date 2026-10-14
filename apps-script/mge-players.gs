@@ -12,9 +12,10 @@
  * Endpoints:
  *  ?view=players -> { view, data: [filas de la pestaña Players tal cual, cabecera -> valor] }
  *  ?view=mge     -> { view, costs, balances, events, unmatched }
+ *  ?view=forts   -> { view, weeks, currentWeek, data: [{ id, name, total, weeks: [n|null] }] }
  */
 
-const TABS = { players: 'Players', costs: 'MGE_Costes', grid: 'MGE_Asignacion', balances: 'MGE_Saldos' };
+const TABS = { players: 'Players', costs: 'MGE_Costes', grid: 'MGE_Asignacion', balances: 'MGE_Saldos', forts: 'Fort Tracker' };
 const MEMBER_COLS = 9; // columnas B..J de MGE_Asignacion (un MGE por columna)
 
 function doGet(e) {
@@ -23,7 +24,8 @@ function doGet(e) {
   try {
     if (view === 'players') body = { view: 'players', data: readPlayers_() };
     else if (view === 'mge') body = Object.assign({ view: 'mge' }, readMge_());
-    else body = { error: 'Usa ?view=players o ?view=mge' };
+    else if (view === 'forts') body = Object.assign({ view: 'forts' }, readForts_());
+    else body = { error: 'Usa ?view=players, ?view=mge o ?view=forts' };
   } catch (err) {
     body = { error: String((err && err.message) || err) };
   }
@@ -136,4 +138,32 @@ function readMge_() {
   });
 
   return { costs: costs, balances: balances, events: events, unmatched: Object.keys(unmatched) };
+}
+
+/* ---------------- Fort Tracker ---------------- */
+
+// Columnas: ID, Name, Total, Week 1..Week N. La semana en curso es la última con algún dato.
+function readForts_() {
+  const values = sheet_(TABS.forts).getDataRange().getValues();
+  const headers = values[0].map(clean_);
+  const idx = name => headers.findIndex(h => h.toLowerCase() === name);
+  const iId = idx('id'), iName = idx('name'), iTotal = idx('total');
+  const weekCols = headers.map((h, i) => /^week\s*\d+/i.test(h) ? i : -1).filter(i => i >= 0);
+
+  const data = values.slice(1)
+    .filter(row => clean_(row[iId]) !== '')
+    .map(row => {
+      const weeks = weekCols.map(i => num_(row[i]));
+      const sum = weeks.reduce((s, n) => s + (n || 0), 0);
+      const total = iTotal >= 0 && num_(row[iTotal]) !== null ? num_(row[iTotal]) : sum;
+      return { id: clean_(row[iId]), name: clean_(row[iName]), total: total, weeks: weeks };
+    });
+
+  let current = -1;
+  weekCols.forEach((_, w) => { if (data.some(p => p.weeks[w] !== null)) current = w; });
+  return {
+    weeks: weekCols.map(i => headers[i]),
+    currentWeek: current, // índice dentro de weeks; -1 si aún no hay datos
+    data: data
+  };
 }
