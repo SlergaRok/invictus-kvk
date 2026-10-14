@@ -15,7 +15,7 @@
  *  ?view=forts   -> { view, weeks, currentWeek, data: [{ id, name, total, weeks: [n|null] }] }
  */
 
-const TABS = { players: 'Players', costs: 'MGE_Costes', grid: 'MGE_Asignacion', balances: 'MGE_Saldos', forts: 'Fort Tracker' };
+const TABS = { players: 'Players', costs: 'MGE_Costes', grid: 'MGE_Asignacion', balances: 'MGE_Saldos', forts: 'Fort Tracker', roles: 'GL-Rally' };
 const MEMBER_COLS = 9; // columnas B..J de MGE_Asignacion (un MGE por columna)
 
 function doGet(e) {
@@ -57,13 +57,33 @@ function num_(v) {
 function readPlayers_() {
   const values = sheet_(TABS.players).getDataRange().getValues();
   const headers = values[0].map(clean_);
+  const roles = readRoles_();
   return values.slice(1)
     .filter(row => clean_(row[0]) !== '')
     .map(row => {
       const obj = {};
       headers.forEach((h, i) => { if (h) obj[h] = (i === 0) ? clean_(row[i]) : row[i]; });
+      if (roles[obj[headers[0]]]) obj.Role = roles[obj[headers[0]]];
       return obj;
     });
+}
+
+// Roles de la pestaña GL-Rally (ID, Name, Role: "Rally Inf", "Garrison Cav"...) indexados por ID.
+// Si un ID aparece varias veces, los roles se juntan: "Rally Inf / Garrison Cav".
+function readRoles_() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TABS.roles);
+  if (!sh) return {};
+  const values = sh.getDataRange().getValues();
+  const headers = values[0].map(h => clean_(h).toLowerCase());
+  const iId = headers.indexOf('id'), iRole = headers.indexOf('role');
+  if (iId < 0 || iRole < 0) return {};
+  const out = {};
+  values.slice(1).forEach(row => {
+    const id = clean_(row[iId]), role = clean_(row[iRole]);
+    if (!id || !role) return;
+    out[id] = out[id] ? out[id] + ' / ' + role : role;
+  });
+  return out;
 }
 
 /* ---------------- MGE ---------------- */

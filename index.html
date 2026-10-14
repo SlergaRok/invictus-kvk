@@ -341,18 +341,27 @@ function pick(row, aliases, fallback = '') {
 }
 
 // Devuelve ['rally'], ['garrison'], ambos o [] a partir del texto de la columna de rol.
-function parseRoles(v) {
-    const s = String(v || '').toLowerCase();
-    const roles = [];
-    if (/rall|lider|leader/.test(s)) roles.push('rally');
-    if (/garr|guarn/.test(s)) roles.push('garrison');
-    return roles;
+// Partes del rol ("Rally Inf / Garrison Cav" -> [{ type: 'rally', label: 'Rally Inf' }, ...]).
+function roleParts(v) {
+    return String(v || '').split(/\s*(?:\/|,|;|&|\+)\s*/)
+        .map(label => label.trim())
+        .filter(Boolean)
+        .map(label => {
+            const s = label.toLowerCase();
+            const type = /garr|guarn/.test(s) ? 'garrison' : (/rall|lider|leader/.test(s) ? 'rally' : null);
+            return { type, label };
+        })
+        .filter(r => r.type);
 }
+
+// Tipos de rol para filtrar y contar: ['rally'], ['garrison'], ambos o [].
+const parseRoles = v => [...new Set(roleParts(v).map(r => r.type))];
 
 const ROLE_ALIASES = ['role', 'rol', 'roles', 'type', 'tipo', 'rally/garrison'];
 
-function roleBadges(roles) {
-    return (roles || []).map(r => `<span class="role ${r}">${r === 'rally' ? 'Rally' : 'Garrison'}</span>`).join(' ');
+// Etiquetas con el texto del rol tal cual está en la pestaña GL-Rally (p. ej. "Rally Inf").
+function roleBadges(role) {
+    return roleParts(role).map(r => `<span class="role ${r.type}">${esc(r.label)}</span>`).join(' ');
 }
 
 // Número o null (celdas vacías o "-" no cuentan como 0).
@@ -376,6 +385,7 @@ function mapPlayer(raw, index) {
         highestAcclaim: numOrNull(pick(row, ['highest aclaim', 'highest acclaim'], null)),
         kpReq: numOrNull(pick(row, ['kp requirements', 'kp requirement', 'kp req'], null)),
         deathReq: numOrNull(pick(row, ['death requirements', 'death requirement', 'deads requirement', 'death req'], null)),
+        role: String(pick(row, ROLE_ALIASES, '')),
         roles: parseRoles(pick(row, ROLE_ALIASES, ''))
     };
 }
@@ -478,7 +488,7 @@ const eventLabel = e => `${eventName(e)} (#${e.number})`;
 function knownRoles(id) {
     for (const list of [statPlayers, players]) {
         const hit = (list || []).find(p => p.id === String(id));
-        if (hit && hit.roles && hit.roles.length) return hit.roles;
+        if (hit && hit.roles && hit.roles.length) return hit.role;
     }
     return [];
 }
@@ -561,7 +571,7 @@ function renderStatsTable() {
     let arr = statPlayers.filter(p => (p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)) && (psRole === 'all' || p.roles.includes(psRole)));
     arr.sort((a, b) => key === 'name' ? a.name.localeCompare(b.name) : (Number(b[key]) || 0) - (Number(a[key]) || 0));
     document.getElementById('psCount').textContent = arr.length + ' members';
-    document.getElementById('psBody').innerHTML = arr.length ? arr.map((p, i) => `<tr class="clickable"><td class="rank">${i + 1}</td><td class="name">${esc(p.name)}</td><td class="left">${p.roles.length ? roleBadges(p.roles) : '<span class="role-none">—</span>'}</td><td class="${statsFromDashboard ? (p.power < 0 ? 'negative' : 'positive') : ''}">${fmt(p.power)}</td><td>${fmt(p.kp)}</td><td>${fmt(p.t4)}</td><td>${fmt(p.t5)}</td><td>${fmt(p.kills)}</td><td>${fmt(p.deads)}</td><td>${optFmt(p.acclaim)}</td><td>${optFmt(p.kpReq)}</td><td>${optFmt(p.deathReq)}</td></tr>`).join('')
+    document.getElementById('psBody').innerHTML = arr.length ? arr.map((p, i) => `<tr class="clickable"><td class="rank">${i + 1}</td><td class="name">${esc(p.name)}</td><td class="left">${p.roles.length ? roleBadges(p.role) : '<span class="role-none">—</span>'}</td><td class="${statsFromDashboard ? (p.power < 0 ? 'negative' : 'positive') : ''}">${fmt(p.power)}</td><td>${fmt(p.kp)}</td><td>${fmt(p.t4)}</td><td>${fmt(p.t5)}</td><td>${fmt(p.kills)}</td><td>${fmt(p.deads)}</td><td>${optFmt(p.acclaim)}</td><td>${optFmt(p.kpReq)}</td><td>${optFmt(p.deathReq)}</td></tr>`).join('')
         : `<tr><td colspan="12" style="text-align:center;color:var(--muted);padding:30px">No members match this filter.</td></tr>`;
     document.querySelectorAll('#psBody tr.clickable').forEach((el, i) => {
         el.addEventListener('click', () => goToPlayer(arr[i].id, arr[i].name));
@@ -589,7 +599,7 @@ async function renderStats() {
         document.getElementById('psGarrison').textContent = anyRoles ? garrison : '—';
         const notes = [];
         if (statsFromDashboard) notes.push('Showing last KvK data from the DashBoard tab — “Power” here is the power change during KvK, not current power.');
-        if (!anyRoles) notes.push('No roles assigned yet: add a <b>Role</b> column (values “Rally”, “Garrison” or both) to the sheet to show the tags.');
+        if (!anyRoles) notes.push('No roles assigned yet: add the players to the <b>GL-Rally</b> tab (Role: “Rally Inf”, “Garrison Cav”…) to show the tags.');
         document.getElementById('playersNotice').innerHTML = notes.length ? `<div class="notice">${notes.join('<br>')}</div>` : '';
         renderStatsTable();
         statsRendered = true;
@@ -855,7 +865,7 @@ async function showPlayerProfile(id, name) {
         const p = statsFromDashboard ? null : statPlayers.find(x => x.id === String(id));
         if (p) {
             document.getElementById('ppName').textContent = p.name;
-            document.getElementById('ppRoles').innerHTML = roleBadges(p.roles);
+            document.getElementById('ppRoles').innerHTML = roleBadges(p.role);
         }
         const statsHtml = p ? `
 <section class="cards cards-5">
@@ -912,7 +922,7 @@ function renderKvkProfile(payload, fallbackName) {
 
     document.getElementById('kpName').textContent = payload.name || fallbackName || 'Unknown';
     document.getElementById('kpId').textContent = 'ID ' + (payload.id || '');
-    document.getElementById('kpRoles').innerHTML = roleBadges(payload.role ? parseRoles(payload.role) : knownRoles(payload.id));
+    document.getElementById('kpRoles').innerHTML = roleBadges(payload.role || knownRoles(payload.id));
     const completed = phases.filter(p => !p.missing && !p.upcoming).length;
     document.getElementById('kpBadge').textContent = (row ? 'Rank #' + row.rank + ' · ' : '') + completed + ' / ' + phaseConfig.length + ' phases';
     document.getElementById('kpFooter').textContent = 'KvK phases — chronological order: ' + phaseConfig.map(p => p.label).join(' → ');
