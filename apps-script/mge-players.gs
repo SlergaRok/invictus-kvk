@@ -10,19 +10,20 @@
  *  Cada vez que cambies este código: Implementar > Gestionar implementaciones > Editar > Nueva versión.
  *
  * Endpoints:
- *  ?view=players -> { view, data: [filas de la pestaña Players tal cual, cabecera -> valor] }
+ *  ?view=players -> { view, lastUpdate, data: [filas de la pestaña Players tal cual, cabecera -> valor] }
  *  ?view=mge     -> { view, costs, balances, events, unmatched }
- *  ?view=forts   -> { view, weeks, currentWeek, data: [{ id, name, total, weeks: [n|null] }] }
+ *  ?view=forts   -> { view, lastUpdate, weeks, currentWeek, data: [{ id, name, total, weeks: [n|null] }] }
  */
 
 const TABS = { players: 'Players', costs: 'MGE_Costes', grid: 'MGE_Asignacion', balances: 'MGE_Saldos', forts: 'Fort Tracker', roles: 'GL-Rally' };
+const LAST_UPDATE_CELL = 'M2';
 const MEMBER_COLS = 9; // columnas B..J de MGE_Asignacion (un MGE por columna)
 
 function doGet(e) {
   const view = String((e && e.parameter && e.parameter.view) || '').toLowerCase();
   let body;
   try {
-    if (view === 'players') body = { view: 'players', data: readPlayers_() };
+    if (view === 'players') body = { view: 'players', data: readPlayers_(), lastUpdate: lastUpdate_(TABS.players) };
     else if (view === 'mge') body = Object.assign({ view: 'mge' }, readMge_());
     else if (view === 'forts') body = Object.assign({ view: 'forts' }, readForts_());
     else body = { error: 'Usa ?view=players, ?view=mge o ?view=forts' };
@@ -37,6 +38,11 @@ function sheet_(name) {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
   if (!sh) throw new Error('No existe la pestaña "' + name + '"');
   return sh;
+}
+
+// Fecha y hora de la última actualización: celda M2 de la pestaña, tal como se ve en el Sheet.
+function lastUpdate_(tab) {
+  return clean_(sheet_(tab).getRange(LAST_UPDATE_CELL).getDisplayValue());
 }
 
 function clean_(v) {
@@ -182,6 +188,7 @@ function readForts_() {
   let current = -1;
   weekCols.forEach((_, w) => { if (data.some(p => p.weeks[w] !== null)) current = w; });
   return {
+    lastUpdate: lastUpdate_(TABS.forts),
     weeks: weekCols.map(i => headers[i]),
     currentWeek: current, // índice dentro de weeks; -1 si aún no hay datos
     data: data
